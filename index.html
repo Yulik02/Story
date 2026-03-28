@@ -13,6 +13,22 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .typing::after { content:'|'; animation:blink 1s infinite; }
     @keyframes blink { 50% { opacity:0; } }
+    
+    /* 🎵 Музыкальные стили */
+    .audio-wave { display:flex; gap:2px; align-items:center; height:20px; }
+    .audio-wave span { 
+      width:3px; background:#fbbf24; border-radius:2px; 
+      animation:wave 1s ease-in-out infinite; 
+    }
+    .audio-wave span:nth-child(2){ animation-delay:0.1s; height:12px; }
+    .audio-wave span:nth-child(3){ animation-delay:0.2s; height:16px; }
+    .audio-wave span:nth-child(4){ animation-delay:0.3s; height:10px; }
+    .audio-wave span:nth-child(5){ animation-delay:0.4s; height:14px; }
+    @keyframes wave { 0%,100%{ transform:scaleY(1); } 50%{ transform:scaleY(1.8); } }
+    
+    .music-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .music-playing .audio-wave span { animation-play-state:running; }
+    .music-paused .audio-wave span { animation-play-state:paused; }
   </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -22,38 +38,49 @@
       <p id="status" class="text-xs text-green-400">AI активен</p>
     </div>
     <div class="flex items-center gap-3">
-      <button id="musicToggle" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm">
+      <!-- 🎵 Кнопка управления музыкой -->
+      <button id="musicToggle" class="music-btn px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm" title="Сгенерировать/воспроизвести музыку">
         <i class="fa-solid fa-music"></i>
         <span id="musicStatus">🎵 Музыка</span>
       </button>
-      <button onclick="restart()" class="text-gray-300 hover:text-white p-2">
+      <button onclick="restart()" class="text-gray-300 hover:text-white p-2" title="Начать заново">
         <i class="fa-solid fa-rotate-right"></i>
       </button>
     </div>
   </header>
 
   <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+    <!-- Изображение -->
     <section class="lg:w-2/3 bg-black flex flex-col justify-center items-center p-4">
       <div class="relative w-full max-w-2xl aspect-video bg-slate-900 rounded overflow-hidden border border-slate-700">
         <img id="img" class="w-full h-full object-cover opacity-0 transition-opacity duration-700" />
         <div id="imgLoader" class="absolute inset-0 flex items-center justify-center bg-black/80">
           <div class="loader"></div>
         </div>
+        <!-- 🎵 Индикатор генерации музыки -->
+        <div id="musicLoader" class="absolute bottom-3 right-3 bg-slate-800/90 px-3 py-1.5 rounded-full text-xs flex items-center gap-2 hidden">
+          <div class="audio-wave">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <span id="musicLoaderText">Генерация...</span>
+        </div>
       </div>
     </section>
 
+    <!-- Текст и выбор -->
     <section class="lg:w-1/3 flex flex-col bg-slate-900 border-l border-slate-800">
       <div id="story" class="flex-1 p-4 overflow-y-auto"></div>
       <div id="choices" class="p-4 bg-slate-800 border-t border-slate-700 space-y-2"></div>
       
-      <!-- 🎵 Аудио панель -->
+      <!-- 🎵 Панель управления аудио -->
       <div id="audioPanel" class="p-3 bg-slate-800/50 border-t border-slate-700 hidden">
         <div class="flex items-center gap-3">
           <button id="playPauseBtn" class="p-2 rounded-full bg-slate-700 hover:bg-slate-600 transition">
             <i class="fa-solid fa-play" id="playIcon"></i>
           </button>
           <div class="flex-1">
-            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.5" class="w-full accent-fbbf24">
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" 
+                   class="w-full accent-fbbf24">
           </div>
           <span class="text-xs text-gray-400" id="musicInfo">—</span>
         </div>
@@ -68,6 +95,8 @@
     const choicesDiv = document.getElementById("choices");
     const img = document.getElementById("img");
     const imgLoader = document.getElementById("imgLoader");
+    const musicLoader = document.getElementById("musicLoader");
+    const musicLoaderText = document.getElementById("musicLoaderText");
     const musicToggle = document.getElementById("musicToggle");
     const musicStatus = document.getElementById("musicStatus");
     const audioPanel = document.getElementById("audioPanel");
@@ -79,17 +108,14 @@
     
     let currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
     let currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
-    let currentMusicPrompt = "dark cyberpunk ambient, slow tempo, synthesizer";
+    let currentMusicPrompt = "ambient cyberpunk background, slow tempo";
     let isMusicPlaying = false;
-    let imageCache = new Map(); // Кэш изображений
+    let musicGenerationPending = false;
     
-    // 🎵 ГЕНЕРАТОР МУЗЫКИ (мягкий и атмосферный)
-    let synth, padSynth, bassSynth, loop, reverb, delay, filter;
-    let isInitialized = false;
-    let currentParams = null;
-    let isPlaying = false;
+    // 🎵 Глобальный объект для браузерной генерации музыки
+    let browserMusic = null;
 
-    // 🔤 Текст
+    // 🔤 Анимация текста
     async function typeText(text) {
       return new Promise(resolve => {
         const p = document.createElement("p");
@@ -110,357 +136,333 @@
       });
     }
 
-    // 🖼️ Генерация изображений ЧЕРЕЗ БРАУЗЕР (Pollinations.ai - бесплатно, без ключа)
+    // 🖼️ Загрузка изображения
     async function loadImage(prompt) {
       imgLoader.classList.remove("hidden");
       img.classList.add("opacity-0");
 
       try {
-        // Проверяем кэш
-        const cacheKey = prompt.substring(0, 100);
-        if (imageCache.has(cacheKey)) {
-          console.log("✅ Loading from cache");
-          img.src = imageCache.get(cacheKey);
-          img.onload = () => {
-            img.classList.remove("opacity-0");
-            imgLoader.classList.add("hidden");
-          };
-          return;
-        }
-
-        // Используем Pollinations.ai (бесплатный AI image generator)
-        const encodedPrompt = encodeURIComponent(prompt + ", cinematic, high quality, detailed");
-        const width = 800;
-        const height = 450;
-        const seed = Math.floor(Math.random() * 10000);
-        
-        // URL для генерации изображения
-        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
-        
-        console.log("🎨 Generating image:", prompt);
-        
-        // Создаем Promise для загрузки
-        await new Promise((resolve, reject) => {
-          const testImg = new Image();
-          testImg.onload = () => {
-            console.log("✅ Image loaded successfully");
-            imageCache.set(cacheKey, imageUrl);
-            img.src = imageUrl;
-            img.classList.remove("opacity-0");
-            imgLoader.classList.add("hidden");
-            resolve();
-          };
-          testImg.onerror = () => {
-            console.warn("❌ Pollinations failed, trying fallback");
-            reject(new Error("Pollinations failed"));
-          };
-          testImg.src = imageUrl;
-          
-          // Таймаут 15 секунд
-          setTimeout(() => reject(new Error("Timeout")), 15000);
+        const r = await fetch(`${API_BASE_URL}/api/image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt })
         });
+
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          console.warn("Image generation warning:", err);
+          img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt)}/800/450`;
+        } else {
+          const data = await r.json();
+          // Исправлено: добавлен префикс data: для base64
+          const prefix = data.imageUrl.startsWith('data:') ? '' : 'data:';
+          img.src = prefix + data.imageUrl;
+        }
         
-      } catch (e) {
-        console.error("Image generation error:", e);
-        
-        // Fallback 1: Picsum.photos с seed на основе промпта
-        try {
-          const seed = prompt.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          const fallbackUrl = `https://picsum.photos/seed/${seed}/800/450`;
-          
-          await new Promise((resolve, reject) => {
-            const testImg = new Image();
-            testImg.onload = () => {
-              console.log("✅ Fallback image loaded");
-              img.src = fallbackUrl;
-              img.classList.remove("opacity-0");
-              imgLoader.classList.add("hidden");
-              resolve();
-            };
-            testImg.onerror = reject;
-            testImg.src = fallbackUrl;
-          });
-        } catch (fallbackError) {
-          // Fallback 2: Простой цветной placeholder
-          console.error("All image methods failed");
-          img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%231e293b" width="800" height="450"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
+        img.onload = () => {
           img.classList.remove("opacity-0");
           imgLoader.classList.add("hidden");
+        };
+        img.onerror = () => {
+          imgLoader.classList.add("hidden");
+          console.error("Failed to load image");
+        };
+      } catch (e) {
+        console.error("Image fetch error:", e);
+        imgLoader.classList.add("hidden");
+      }
+    }
+
+    // 🎵 БРАУЗЕРНЫЙ ГЕНЕРАТОР МУЗЫКИ (Web Audio API + Tone.js)
+    class BrowserMusicGenerator {
+      constructor() {
+        this.synth = null;
+        this.reverb = null;
+        this.delay = null;
+        this.isInitialized = false;
+        this.isPlaying = false;
+        this.currentPrompt = "";
+      }
+
+      // Инициализация аудио-контекста (требует жеста пользователя)
+      async init() {
+        if (this.isInitialized) return true;
+        
+        try {
+          await Tone.start();
+          console.log("🔊 Audio context initialized");
+          
+          // Создаём эффекты
+          this.reverb = new Tone.Reverb({ decay: 4, wet: 0.3 }).toDestination();
+          this.delay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.3, wet: 0.2 }).connect(this.reverb);
+          
+          this.isInitialized = true;
+          return true;
+        } catch (err) {
+          console.error("❌ Failed to init audio:", err);
+          return false;
+        }
+      }
+
+      // Парсинг промпта для извлечения параметров
+      parsePrompt(prompt) {
+        const p = prompt.toLowerCase();
+        
+        // Настроение → темп и тональность
+        let tempo = 80;
+        let rootNote = "C3";
+        let scale = "minor";
+        let mood = "ambient";
+        
+        if (p.includes("fast") || p.includes("tense") || p.includes("action")) {
+          tempo = 120; scale = "phrygian"; mood = "tense";
+        } else if (p.includes("calm") || p.includes("peaceful") || p.includes("reflective")) {
+          tempo = 60; scale = "major"; mood = "calm";
+        } else if (p.includes("dark") || p.includes("cyberpunk") || p.includes("neon")) {
+          tempo = 70; rootNote = "D#3"; scale = "minor"; mood = "dark";
+        }
+        
+        // Инструменты
+        const instruments = [];
+        if (p.includes("synth") || p.includes("electronic")) instruments.push("synth");
+        if (p.includes("piano") || p.includes("keys")) instruments.push("piano");
+        if (p.includes("bass")) instruments.push("bass");
+        if (p.includes("drone") || p.includes("ambient")) instruments.push("drone");
+        if (instruments.length === 0) instruments.push("synth", "drone");
+        
+        return { tempo, rootNote, scale, mood, instruments };
+      }
+
+      // Генерация последовательности нот
+      generateSequence(params, length = 16) {
+        const scales = {
+          minor: [0, 2, 3, 5, 7, 8, 10],
+          major: [0, 2, 4, 5, 7, 9, 11],
+          phrygian: [0, 1, 4, 5, 7, 8, 10],
+          dorian: [0, 2, 3, 5, 7, 9, 10]
+        };
+        const scale = scales[params.scale] || scales.minor;
+        const root = this.noteToMidi(params.rootNote);
+        const seq = [];
+        
+        for (let i = 0; i < length; i++) {
+          const step = scale[Math.floor(Math.random() * scale.length)];
+          const octave = Math.random() > 0.7 ? 1 : 0;
+          seq.push({ 
+            note: this.midiToNote(root + step + octave * 12), 
+            duration: Math.random() > 0.8 ? "4n" : "8n",
+            velocity: 0.3 + Math.random() * 0.4 
+          });
+        }
+        return seq;
+      }
+
+      noteToMidi(note) {
+        const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const match = note.match(/^([A-G]#?)(\d)$/);
+        if (!match) return 60;
+        const [, name, octave] = match;
+        return notes.indexOf(name) + 12 * (parseInt(octave) + 1);
+      }
+
+      midiToNote(midi) {
+        const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const octave = Math.floor(midi / 12) - 1;
+        const note = notes[midi % 12];
+        return `${note}${octave}`;
+      }
+
+      // Создание синтезатора под настроение
+      createSynth(params) {
+        if (params.instruments.includes("piano")) {
+          return new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.4 }
+          }).connect(this.delay);
+        }
+        if (params.instruments.includes("bass")) {
+          return new Tone.MonoSynth({
+            oscillator: { type: "sawtooth" },
+            filter: { Q: 2, type: "lowpass", rolloff: -24 },
+            envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 }
+          }).connect(this.reverb);
+        }
+        // По умолчанию — атмосферный синт
+        return new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: params.mood === "dark" ? "sawtooth" : "sine" },
+          envelope: { attack: params.mood === "calm" ? 0.5 : 0.1, decay: 0.3, sustain: 0.4, release: params.mood === "calm" ? 1 : 0.5 }
+        }).connect(this.delay);
+      }
+
+      // 🎵 Основная функция генерации и воспроизведения
+      async generateAndPlay(prompt, duration = 15) {
+        if (!await this.init()) {
+          throw new Error("Не удалось инициализировать аудио. Нажмите на страницу и попробуйте снова.");
+        }
+        
+        // Останавливаем предыдущее воспроизведение
+        this.stop();
+        
+        const params = this.parsePrompt(prompt);
+        this.currentPrompt = prompt;
+        
+        console.log(`🎵 Generating: ${prompt} → tempo:${params.tempo} scale:${params.scale} mood:${params.mood}`);
+        
+        // Создаём синтезатор
+        this.synth = this.createSynth(params);
+        this.synth.volume.value = -10;
+        
+        // Запускаем секвенсор
+        const sequence = this.generateSequence(params);
+        let notesPlayed = 0;
+        const maxNotes = Math.floor(duration * params.tempo / 60 / 0.5); // ~2 ноты в секунду
+        
+        // Фоновый дрон для атмосферы
+        if (params.instruments.includes("drone")) {
+          const drone = new Tone.MembraneSynth({ 
+            pitchDecay: 0.05, octaves: 2, 
+            envelope: { attack: 0.1, decay: 0.2, sustain: 0.8, release: 2 }
+          }).connect(this.reverb);
+          drone.triggerAttackRelease(params.rootNote, duration + 1);
+        }
+        
+        // Проигрываем последовательность
+        Tone.Transport.bpm.value = params.tempo;
+        
+        const loop = new Tone.Loop((time) => {
+          if (notesPlayed >= maxNotes || !this.isPlaying) {
+            this.stop();
+            return;
+          }
+          
+          const note = sequence[notesPlayed % sequence.length];
+          this.synth.triggerAttackRelease(note.note, note.duration, time, note.velocity);
+          notesPlayed++;
+        }, "8n").start(0);
+        
+        // Запускаем транспорт
+        Tone.Transport.start();
+        this.isPlaying = true;
+        
+        // Авто-остановка через duration секунд
+        setTimeout(() => {
+          if (this.isPlaying) this.stop();
+        }, duration * 1000);
+        
+        return { duration, params };
+      }
+
+      // Остановка воспроизведения
+      stop() {
+        if (this.synth) {
+          this.synth.releaseAll();
+        }
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        this.isPlaying = false;
+      }
+
+      // Пауза/возобновление
+      togglePause() {
+        if (!this.isInitialized) return;
+        if (Tone.Transport.state === "started") {
+          Tone.Transport.pause();
+          this.isPlaying = false;
+        } else if (Tone.Transport.state === "paused") {
+          Tone.Transport.start();
+          this.isPlaying = true;
+        }
+        return this.isPlaying;
+      }
+
+      // Установка громкости
+      setVolume(value) {
+        if (this.synth) {
+          // Конвертируем 0-1 в -60..0 dB
+          const db = value === 0 ? -60 : Tone.gainToDb(value);
+          this.synth.volume.rampTo(db, 0.1);
         }
       }
     }
 
-    // 🎵 Инициализация аудио
-    async function initAudio() {
-      if (isInitialized) return true;
-      
-      try {
-        await Tone.start();
-        
-        // Мягкий реверб
-        reverb = new Tone.Reverb({ 
-          decay: 5,
-          wet: 0.5
-        }).toDestination();
-        
-        // Delay для глубины
-        delay = new Tone.FeedbackDelay({ 
-          delayTime: "4n", 
-          feedback: 0.4, 
-          wet: 0.3 
-        }).connect(reverb);
-        
-        // Низкочастотный фильтр для сглаживания
-        filter = new Tone.Filter({
-          frequency: 3000,
-          type: "lowpass",
-          rolloff: -12
-        }).connect(delay);
-        
-        isInitialized = true;
-        console.log("✅ Audio initialized");
-        return true;
-      } catch (err) {
-        console.error("❌ Audio init failed:", err);
-        return false;
-      }
-    }
+    // Инициализация генератора
+    browserMusic = new BrowserMusicGenerator();
 
-    // 🎵 Создание мягкого синтезатора
-    function createSoftSynth() {
-      return new Tone.PolySynth(Tone.Synth, {
-        oscillator: { 
-          type: "triangle",
-          count: 3
-        },
-        envelope: { 
-          attack: 0.8,
-          decay: 0.5,
-          sustain: 0.6,
-          release: 2.5
-        },
-        volume: -15
-      }).connect(filter);
-    }
-
-    // 🎵 Создание pad-синтезатора
-    function createPadSynth() {
-      return new Tone.PolySynth(Tone.AMSynth, {
-        harmonicity: 2.5,
-        oscillator: { type: "sine" },
-        envelope: { 
-          attack: 1.5,
-          decay: 0.5, 
-          sustain: 0.7, 
-          release: 3
-        },
-        modulation: { type: "square" },
-        modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 },
-        volume: -20
-      }).connect(reverb);
-    }
-
-    // 🎵 Создание бас-синтезатора
-    function createBassSynth() {
-      return new Tone.MonoSynth({
-        oscillator: { type: "sine" },
-        filter: { 
-          Q: 1, 
-          type: "lowpass", 
-          rolloff: -24,
-          frequency: 400
-        },
-        envelope: { 
-          attack: 0.1, 
-          decay: 0.4, 
-          sustain: 0.5, 
-          release: 1 
-        },
-        filterEnvelope: {
-          attack: 0.001,
-          decay: 0.2,
-          sustain: 0.5,
-          baseFrequency: 100,
-          octaves: 2
-        },
-        volume: -18
-      }).connect(reverb);
-    }
-
-    // 🎵 Генерация МЯГКОЙ музыки
-    async function generateBrowserMusic(prompt) {
-      if (!await initAudio()) {
-        throw new Error("Не удалось инициализировать аудио. Кликните по странице и попробуйте снова.");
-      }
-
-      stopMusic();
-
-      // Парсинг промпта
-      const p = prompt.toLowerCase();
-      let tempo = 65;
-      let rootNote = 36;
-      let scale = [0, 3, 7, 10];
-      
-      if (p.includes("calm") || p.includes("peaceful")) {
-        tempo = 55; 
-        scale = [0, 4, 7, 11];
-        rootNote = 40;
-      } else if (p.includes("tense") || p.includes("action")) {
-        tempo = 85; 
-        scale = [0, 3, 6, 10];
-      } else if (p.includes("cyberpunk") || p.includes("dark") || p.includes("neon")) {
-        tempo = 60; 
-        scale = [0, 3, 7, 9, 10];
-        rootNote = 38;
-      }
-
-      currentParams = { tempo, scale, rootNote, prompt };
-
-      // Создаём синтезаторы
-      synth = createSoftSynth();
-      padSynth = createPadSynth();
-      bassSynth = createBassSynth();
-
-      // Генерация аккордов
-      const chords = [];
-      for (let i = 0; i < 8; i++) {
-        const interval1 = scale[Math.floor(Math.random() * scale.length)];
-        const interval2 = scale[Math.floor(Math.random() * scale.length)];
-        const interval3 = scale[Math.floor(Math.random() * scale.length)];
-        
-        chords.push({
-          notes: [
-            rootNote + interval1,
-            rootNote + interval2 + 12,
-            rootNote + interval3 + 12
-          ],
-          duration: "2n",
-          time: i * 2
-        });
-      }
-
-      // Запуск
-      Tone.Transport.bpm.value = tempo;
-      let chordIndex = 0;
-
-      loop = new Tone.Loop((time) => {
-        if (chordIndex >= chords.length) chordIndex = 0;
-        const chord = chords[chordIndex];
-        
-        synth.triggerAttackRelease(
-          chord.notes.map(n => Tone.Frequency(n).toNote()), 
-          chord.duration, 
-          time,
-          0.4
-        );
-        
-        if (chordIndex % 2 === 0) {
-          bassSynth.triggerAttackRelease(
-            Tone.Frequency(rootNote).toNote(),
-            "1n",
-            time,
-            0.5
-          );
-        }
-        
-        if (chordIndex % 4 === 0) {
-          padSynth.triggerAttackRelease(
-            [Tone.Frequency(rootNote + 12).toNote(), Tone.Frequency(rootNote + 19).toNote()],
-            "4n",
-            time,
-            0.3
-          );
-        }
-        
-        chordIndex++;
-      }, "2n").start(0);
-
-      Tone.Transport.start();
-      isPlaying = true;
-      isMusicPlaying = true;
-
-      return { tempo, duration: "continuous" };
-    }
-
-    // 🎵 Остановка
-    function stopMusic() {
-      if (loop) {
-        loop.stop();
-        loop.dispose();
-        loop = null;
-      }
-      if (synth) {
-        synth.releaseAll();
-        synth.dispose();
-        synth = null;
-      }
-      if (padSynth) {
-        padSynth.releaseAll();
-        padSynth.dispose();
-        padSynth = null;
-      }
-      if (bassSynth) {
-        bassSynth.releaseAll();
-        bassSynth.dispose();
-        bassSynth = null;
-      }
-      Tone.Transport.stop();
-      Tone.Transport.cancel();
-      isPlaying = false;
-      isMusicPlaying = false;
-    }
-
-    // 🎵 Play/Pause
-    function togglePlayPause() {
-      if (!isInitialized) {
+    // 🎵 Обработчики управления
+    volumeSlider.addEventListener('input', (e) => {
+      browserMusic?.setVolume(parseFloat(e.target.value));
+    });
+    
+    playPauseBtn.addEventListener('click', () => {
+      if (!browserMusic?.isInitialized) {
         handleMusicToggle();
         return;
       }
-      
-      if (Tone.Transport.state === "started") {
-        Tone.Transport.pause();
-        isMusicPlaying = false;
-      } else {
-        Tone.Transport.start();
-        isMusicPlaying = true;
-      }
-      updateMusicUI();
+      const playing = browserMusic.togglePause();
+      updateMusicUI(playing);
+    });
+    
+    musicToggle.addEventListener('click', handleMusicToggle);
+
+    // 🎵 UI обновления
+    function updateMusicUI(playing) {
+      isMusicPlaying = playing;
+      playIcon.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+      musicToggle.classList.toggle('music-playing', playing);
+      musicToggle.classList.toggle('music-paused', !playing && browserMusic?.isInitialized);
     }
 
-    // 🎵 UI
-    function updateMusicUI() {
-      playIcon.className = isMusicPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
-      musicToggle.classList.toggle('opacity-70', !isMusicPlaying);
+    function setMusicStatus(text, loading = false) {
+      musicStatus.textContent = text;
+      musicToggle.disabled = loading || musicGenerationPending;
+      musicToggle.classList.toggle("opacity-70", loading);
     }
 
-    // 🎵 Обработчик кнопки
+    // 🎵 Обработчик кнопки музыки
     async function handleMusicToggle() {
+      if (musicGenerationPending) return;
+      
+      // Если уже сгенерировано и играет — пауза
+      if (browserMusic?.isPlaying) {
+        browserMusic.togglePause();
+        updateMusicUI(false);
+        return;
+      }
+      
+      // Генерация новой музыки
+      musicGenerationPending = true;
       musicToggle.disabled = true;
-      musicStatus.textContent = "⏳ Генерация...";
+      setMusicStatus("⏳ Генерация...", true);
       
       try {
-        await generateBrowserMusic(currentMusicPrompt);
+        musicLoader.classList.remove("hidden");
+        musicLoaderText.textContent = "Синтез...";
         
+        const result = await browserMusic.generateAndPlay(currentMusicPrompt, 15);
+        
+        // Обновляем UI
         audioPanel.classList.remove("hidden");
-        musicInfo.textContent = `${currentParams?.tempo || 60} BPM • Soft Ambient`;
+        musicInfo.textContent = `15с • ${result.params.mood} • ${result.params.tempo}BPM`;
         musicPromptDisplay.textContent = currentMusicPrompt;
-        musicStatus.textContent = "🎵 Играет";
-        updateMusicUI();
+        updateMusicUI(true);
+        setMusicStatus("🎵 Играет", false);
         
       } catch (err) {
-        console.error("Music error:", err);
-        alert("❌ Ошибка музыки:\n" + err.message);
-        musicStatus.textContent = "🎵 Ошибка";
+        console.error("Music generation error:", err);
+        alert("❌ Не удалось сгенерировать музыку:\n" + (err.message || "Проверьте консоль"));
+        setMusicStatus("🎵 Ошибка", false);
       } finally {
+        musicLoader.classList.add("hidden");
+        musicGenerationPending = false;
         musicToggle.disabled = false;
       }
     }
 
-    // 🎬 Сцена
+    // 🎬 Загрузка сцены
     async function loadScene(choice = "") {
       choicesDiv.innerHTML = '<div class="flex justify-center py-4"><div class="loader"></div></div>';
       storyDiv.innerHTML = "";
-      musicStatus.textContent = "🎵 Музыка";
+      setMusicStatus("🎵 Музыка", false);
 
       if (choice) {
         try {
@@ -475,8 +477,11 @@
           currentImagePrompt = data.imagePrompt || currentImagePrompt;
           currentMusicPrompt = data.musicPrompt || currentMusicPrompt;
           
-          // Загружаем только изображение (браузерная генерация)
-          await loadImage(currentImagePrompt);
+          await Promise.all([
+            loadImage(currentImagePrompt)
+            // Браузерная музыка генерируется по запросу пользователя, не автоматически
+          ]);
+          
           await typeText(currentText);
           renderChoices(data.choices || []);
           
@@ -485,11 +490,12 @@
           }
           
         } catch (err) {
-          console.error("Scene error:", err);
-          storyDiv.innerHTML = "<p class='text-red-400'>Ошибка. Попробуйте ещё раз.</p>";
+          console.error("Scene load error:", err);
+          storyDiv.innerHTML = "<p class='text-red-400'>Ошибка загрузки сцены. Попробуйте ещё раз.</p>";
           renderChoices([{ text: "↻ Повторить", next: choice }]);
         }
       } else {
+        // Стартовая сцена
         await loadImage(currentImagePrompt);
         await typeText(currentText);
         renderChoices([
@@ -500,28 +506,29 @@
       }
     }
 
+    // 🔘 Отрисовка кнопок выбора
     function renderChoices(items) {
       choicesDiv.innerHTML = "";
       items.forEach(c => {
         const btn = document.createElement("button");
-        btn.className = "w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition";
+        btn.className = "w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition border border-transparent hover:border-fbbf24";
         btn.textContent = c.text;
         btn.onclick = () => loadScene(c.text);
         choicesDiv.appendChild(btn);
       });
     }
 
+    // 🔄 Перезапуск
     function restart() {
-      stopMusic();
       currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
       currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
-      currentMusicPrompt = "dark cyberpunk ambient, slow tempo, synthesizer";
-      imageCache.clear(); // Очищаем кэш
+      currentMusicPrompt = "ambient cyberpunk background, slow tempo";
       
+      // Сброс аудио
+      browserMusic?.stop();
       audioPanel.classList.add("hidden");
-      isMusicPlaying = false;
-      musicStatus.textContent = "🎵 Музыка";
-      updateMusicUI();
+      setMusicStatus("🎵 Музыка", false);
+      updateMusicUI(false);
       
       storyDiv.innerHTML = "";
       choicesDiv.innerHTML = "";
@@ -530,19 +537,10 @@
       loadScene();
     }
 
-    // Event listeners
-    volumeSlider.addEventListener('input', (e) => {
-      const vol = Tone.gainToDb(parseFloat(e.target.value));
-      if (synth) synth.volume.rampTo(vol - 5, 0.1);
-      if (padSynth) padSynth.volume.rampTo(vol - 10, 0.1);
-      if (bassSynth) bassSynth.volume.rampTo(vol - 8, 0.1);
+    // 🚀 Старт
+    document.addEventListener("DOMContentLoaded", () => {
+      loadScene();
     });
-    
-    playPauseBtn.addEventListener('click', togglePlayPause);
-    musicToggle.addEventListener('click', handleMusicToggle);
-
-    // Start
-    loadScene();
   </script>
 </body>
 </html>
