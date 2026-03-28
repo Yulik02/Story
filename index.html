@@ -13,13 +13,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .typing::after { content:'|'; animation:blink 1s infinite; }
     @keyframes blink { 50% { opacity:0; } }
-    .audio-wave { display:flex; gap:2px; align-items:center; height:20px; }
-    .audio-wave span { width:3px; background:#fbbf24; border-radius:2px; animation:wave 1s ease-in-out infinite; }
-    .audio-wave span:nth-child(2){ animation-delay:0.1s; height:12px; }
-    .audio-wave span:nth-child(3){ animation-delay:0.2s; height:16px; }
-    .audio-wave span:nth-child(4){ animation-delay:0.3s; height:10px; }
-    .audio-wave span:nth-child(5){ animation-delay:0.4s; height:14px; }
-    @keyframes wave { 0%,100%{ transform:scaleY(1); } 50%{ transform:scaleY(1.8); } }
   </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -60,7 +53,7 @@
             <i class="fa-solid fa-play" id="playIcon"></i>
           </button>
           <div class="flex-1">
-            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" class="w-full accent-fbbf24">
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.5" class="w-full accent-fbbf24">
           </div>
           <span class="text-xs text-gray-400" id="musicInfo">—</span>
         </div>
@@ -89,10 +82,11 @@
     let currentMusicPrompt = "dark cyberpunk ambient, slow tempo, synthesizer";
     let isMusicPlaying = false;
     
-    // 🎵 ГЕНЕРАТОР МУЗЫКИ В БРАУЗЕРЕ (Tone.js)
-    let synth, loop, reverb, delay;
+    // 🎵 ГЕНЕРАТОР МУЗЫКИ (мягкий и атмосферный)
+    let synth, padSynth, bassSynth, loop, reverb, delay, filter;
     let isInitialized = false;
     let currentParams = null;
+    let isPlaying = false;
 
     // 🔤 Текст
     async function typeText(text) {
@@ -115,7 +109,7 @@
       });
     }
 
-    // 🖼️ Изображение
+    // 🖼️ Изображение (ИСПРАВЛЕНО)
     async function loadImage(prompt) {
       imgLoader.classList.remove("hidden");
       img.classList.add("opacity-0");
@@ -127,18 +121,49 @@
           body: JSON.stringify({ prompt })
         });
 
-        if (!r.ok) throw new Error("Image API error");
-        const data = await r.json();
-        img.src = data.imageUrl.startsWith('data:') ? data.imageUrl : `data:${data.imageUrl}`;
+        if (!r.ok) {
+          console.warn("Image API error:", r.status);
+          throw new Error("Image API error");
+        }
         
+        const data = await r.json();
+        console.log("Image data received:", data.imageUrl ? "has imageUrl" : "no imageUrl");
+        
+        // Правильная обработка base64
+        if (data.imageUrl) {
+          // Если уже есть data:image - используем как есть
+          if (data.imageUrl.startsWith('data:image')) {
+            img.src = data.imageUrl;
+          } else if (data.imageUrl.startsWith('image/')) {
+            // Если начинается с image/png;base64 - добавляем data:
+            img.src = 'data:' + data.imageUrl;
+          } else {
+            // Иначе предполагаем что это base64
+            img.src = 'data:image/png;base64,' + data.imageUrl;
+          }
+          
+          img.onload = () => {
+            console.log("Image loaded successfully");
+            img.classList.remove("opacity-0");
+            imgLoader.classList.add("hidden");
+          };
+          
+          img.onerror = (e) => {
+            console.error("Image load failed:", e);
+            imgLoader.classList.add("hidden");
+          };
+        } else {
+          throw new Error("No imageUrl in response");
+        }
+        
+      } catch (e) {
+        console.error("Image error:", e);
+        // Fallback на placeholder
+        img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt.substring(0, 50))}/800/450`;
         img.onload = () => {
           img.classList.remove("opacity-0");
           imgLoader.classList.add("hidden");
         };
-      } catch (e) {
-        console.error("Image error:", e);
-        img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt)}/800/450`;
-        imgLoader.classList.add("hidden");
       }
     }
 
@@ -149,8 +174,25 @@
       try {
         await Tone.start();
         
-        reverb = new Tone.Reverb({ decay: 3, wet: 0.4 }).toDestination();
-        delay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.3, wet: 0.3 }).connect(reverb);
+        // Мягкий реверб
+        reverb = new Tone.Reverb({ 
+          decay: 5,      // Длинный decay для атмосферы
+          wet: 0.5       // 50% эффекта
+        }).toDestination();
+        
+        // Delay для глубины
+        delay = new Tone.FeedbackDelay({ 
+          delayTime: "4n", 
+          feedback: 0.4, 
+          wet: 0.3 
+        }).connect(reverb);
+        
+        // Низкочастотный фильтр для сглаживания
+        filter = new Tone.Filter({
+          frequency: 3000,
+          type: "lowpass",
+          rolloff: -12
+        }).connect(delay);
         
         isInitialized = true;
         console.log("✅ Audio initialized");
@@ -161,65 +203,161 @@
       }
     }
 
-    // 🎵 Генерация музыки (БЕЗ СЕРВЕРА!)
+    // 🎵 Создание мягкого синтезатора
+    function createSoftSynth() {
+      return new Tone.PolySynth(Tone.Synth, {
+        oscillator: { 
+          type: "triangle",  // Мягкая волна вместо sawtooth
+          count: 3           // Немного detune для ширины
+        },
+        envelope: { 
+          attack: 0.8,    // Очень плавная атака (было 0.1)
+          decay: 0.5,     // Плавный спад
+          sustain: 0.6,   // Хорошая sustain
+          release: 2.5    // Долгий release для плавности (было 0.8)
+        },
+        volume: -15       // Тише (было -12)
+      }).connect(filter);
+    }
+
+    // 🎵 Создание pad-синтезатора (фоновая атмосфера)
+    function createPadSynth() {
+      return new Tone.PolySynth(Tone.AMSynth, {
+        harmonicity: 2.5,
+        oscillator: { type: "sine" },
+        envelope: { 
+          attack: 1.5,    // Очень медленная атака
+          decay: 0.5, 
+          sustain: 0.7, 
+          release: 3      // Очень долгий release
+        },
+        modulation: { type: "square" },
+        modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 },
+        volume: -20
+      }).connect(reverb);
+    }
+
+    // 🎵 Создание бас-синтезатора
+    function createBassSynth() {
+      return new Tone.MonoSynth({
+        oscillator: { type: "sine" },
+        filter: { 
+          Q: 1, 
+          type: "lowpass", 
+          rolloff: -24,
+          frequency: 400
+        },
+        envelope: { 
+          attack: 0.1, 
+          decay: 0.4, 
+          sustain: 0.5, 
+          release: 1 
+        },
+        filterEnvelope: {
+          attack: 0.001,
+          decay: 0.2,
+          sustain: 0.5,
+          baseFrequency: 100,
+          octaves: 2
+        },
+        volume: -18
+      }).connect(reverb);
+    }
+
+    // 🎵 Генерация МЯГКОЙ музыки
     async function generateBrowserMusic(prompt) {
       if (!await initAudio()) {
         throw new Error("Не удалось инициализировать аудио. Кликните по странице и попробуйте снова.");
       }
 
-      // Остановка предыдущей
       stopMusic();
 
       // Парсинг промпта
       const p = prompt.toLowerCase();
-      let tempo = 70;
-      let scale = [0, 3, 5, 7, 10]; // minor pentatonic
-      let waveType = "sawtooth";
+      let tempo = 65;  // Медленнее (было 70-75)
+      let rootNote = 36; // C2
+      let scale = [0, 3, 7, 10]; // minor 7th - мягкий джазовый звук
       
       if (p.includes("calm") || p.includes("peaceful")) {
-        tempo = 60; scale = [0, 4, 7, 11]; waveType = "sine";
+        tempo = 55; 
+        scale = [0, 4, 7, 11]; // major 7th - очень мягко
+        rootNote = 40; // E2
       } else if (p.includes("tense") || p.includes("action")) {
-        tempo = 110; scale = [0, 1, 6, 7]; waveType = "sawtooth";
+        tempo = 85; 
+        scale = [0, 3, 6, 10]; // diminished - напряжённо но мягко
       } else if (p.includes("cyberpunk") || p.includes("dark") || p.includes("neon")) {
-        tempo = 75; scale = [0, 2, 3, 6, 7, 8, 11]; waveType = "sawtooth";
+        tempo = 60; 
+        scale = [0, 3, 7, 9, 10]; // minor 9th - атмосферно
+        rootNote = 38; // D#2
       }
 
-      currentParams = { tempo, scale, waveType, prompt };
+      currentParams = { tempo, scale, rootNote, prompt };
 
-      // Синтезатор
-      synth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: waveType },
-        envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 0.8 }
-      }).connect(delay);
-      
-      synth.volume.value = -12;
+      // Создаём синтезаторы
+      synth = createSoftSynth();
+      padSynth = createPadSynth();
+      bassSynth = createBassSynth();
 
-      // Генерация мелодии
-      const rootNote = 48; // C3
-      const notes = [];
-      
-      for (let i = 0; i < 32; i++) {
-        const interval = scale[Math.floor(Math.random() * scale.length)];
-        const octave = Math.floor(Math.random() * 2) * 12;
-        notes.push({
-          note: rootNote + interval + octave,
-          duration: Math.random() > 0.7 ? "4n" : "8n",
-          time: i * 0.5
+      // Генерация аккордов (вместо резких отдельных нот)
+      const chords = [];
+      for (let i = 0; i < 8; i++) {
+        const interval1 = scale[Math.floor(Math.random() * scale.length)];
+        const interval2 = scale[Math.floor(Math.random() * scale.length)];
+        const interval3 = scale[Math.floor(Math.random() * scale.length)];
+        
+        chords.push({
+          notes: [
+            rootNote + interval1,
+            rootNote + interval2 + 12,
+            rootNote + interval3 + 12
+          ],
+          duration: "2n",  // Длинные аккорды (было 8n)
+          time: i * 2      // Каждые 2 секунды
         });
       }
 
       // Запуск
       Tone.Transport.bpm.value = tempo;
-      let noteIndex = 0;
+      let chordIndex = 0;
 
+      // Мелодия - очень медленно и плавно
       loop = new Tone.Loop((time) => {
-        if (noteIndex >= notes.length) noteIndex = 0;
-        const note = notes[noteIndex];
-        synth.triggerAttackRelease(Tone.Frequency(note.note).toNote(), note.duration, time);
-        noteIndex++;
-      }, "8n").start(0);
+        if (chordIndex >= chords.length) chordIndex = 0;
+        const chord = chords[chordIndex];
+        
+        // Играем аккорд
+        synth.triggerAttackRelease(
+          chord.notes.map(n => Tone.Frequency(n).toNote()), 
+          chord.duration, 
+          time,
+          0.4  // velocity
+        );
+        
+        // Бас - только корневая нота
+        if (chordIndex % 2 === 0) {
+          bassSynth.triggerAttackRelease(
+            Tone.Frequency(rootNote).toNote(),
+            "1n",
+            time,
+            0.5
+          );
+        }
+        
+        // Pad - фоновые длинные ноты
+        if (chordIndex % 4 === 0) {
+          padSynth.triggerAttackRelease(
+            [Tone.Frequency(rootNote + 12).toNote(), Tone.Frequency(rootNote + 19).toNote()],
+            "4n",
+            time,
+            0.3
+          );
+        }
+        
+        chordIndex++;
+      }, "2n").start(0);  // Каждую половину такта
 
       Tone.Transport.start();
+      isPlaying = true;
       isMusicPlaying = true;
 
       return { tempo, duration: "continuous" };
@@ -234,10 +372,22 @@
       }
       if (synth) {
         synth.releaseAll();
+        synth.dispose();
         synth = null;
+      }
+      if (padSynth) {
+        padSynth.releaseAll();
+        padSynth.dispose();
+        padSynth = null;
+      }
+      if (bassSynth) {
+        bassSynth.releaseAll();
+        bassSynth.dispose();
+        bassSynth = null;
       }
       Tone.Transport.stop();
       Tone.Transport.cancel();
+      isPlaying = false;
       isMusicPlaying = false;
     }
 
@@ -251,7 +401,7 @@
       if (Tone.Transport.state === "started") {
         Tone.Transport.pause();
         isMusicPlaying = false;
-      } else if (Tone.Transport.state === "paused" || isMusicPlaying) {
+      } else {
         Tone.Transport.start();
         isMusicPlaying = true;
       }
@@ -273,7 +423,7 @@
         await generateBrowserMusic(currentMusicPrompt);
         
         audioPanel.classList.remove("hidden");
-        musicInfo.textContent = `${currentParams?.tempo || 70} BPM • Browser Synth`;
+        musicInfo.textContent = `${currentParams?.tempo || 60} BPM • Soft Ambient`;
         musicPromptDisplay.textContent = currentMusicPrompt;
         musicStatus.textContent = "🎵 Играет";
         updateMusicUI();
@@ -361,7 +511,10 @@
 
     // Event listeners
     volumeSlider.addEventListener('input', (e) => {
-      if (synth) synth.volume.rampTo(Tone.gainToDb(parseFloat(e.target.value)), 0.1);
+      const vol = Tone.gainToDb(parseFloat(e.target.value));
+      if (synth) synth.volume.rampTo(vol - 5, 0.1);
+      if (padSynth) padSynth.volume.rampTo(vol - 10, 0.1);
+      if (bassSynth) bassSynth.volume.rampTo(vol - 8, 0.1);
     });
     
     playPauseBtn.addEventListener('click', togglePlayPause);
