@@ -200,66 +200,96 @@
       }
     }
 
-    // 🎵 Генерация музыки через API
-    async function generateMusic(prompt, duration = 10, maxRetries = 3) {
-      let retries = 0;
+    // 🎵 Генерация музыки через API (ОБНОВЛЁННАЯ)
+async function generateMusic(prompt, duration = 10, maxRetries = 3) {
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      musicLoader.classList.remove("hidden");
+      musicLoaderText.textContent = retries > 0 ? `Повтор (${retries+1}/${maxRetries})...` : "Генерация...";
+      setMusicStatus("⏳ Генерация...", true);
       
-      while (retries < maxRetries) {
+      const response = await fetch(`${API_BASE_URL}/api/music`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, duration })
+      });
+      
+      // 🔍 Проверяем Content-Type
+      const contentType = response.headers.get("content-type");
+      
+      // 🔄 Обработка 503 - модель загружается
+      if (response.status === 503) {
+        let data;
         try {
-          musicLoader.classList.remove("hidden");
-          musicLoaderText.textContent = retries > 0 ? `Повтор (${retries+1}/${maxRetries})...` : "Генерация...";
-          setMusicStatus("⏳ Генерация...", true);
-          
-          const response = await fetch(`${API_BASE_URL}/api/music`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, duration })
-          });
-          
-          const data = await response.json();
-          
-          // 🔄 Обработка 503 - модель загружается
-          if (response.status === 503) {
-            const waitTime = Math.min((data.estimated_time || 20) * 1000, 60000);
-            musicLoaderText.textContent = `Модель загружается... (${Math.ceil(waitTime/1000)}с)`;
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            retries++;
-            continue;
-          }
-          
-          if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
-          }
-          
-          // ✅ Успех
-          generatedAudioUrl = data.audioUrl;
-          audioPlayer.src = `data:${generatedAudioUrl}`;
-          musicInfo.textContent = `${data.duration || duration}с • ${data.model?.split('/').pop() || 'MusicGen'}`;
-          musicPromptDisplay.textContent = prompt;
-          
-          // Показать панель управления
-          audioPanel.classList.remove("hidden");
-          
-          // Авто-воспроизведение (если уже было взаимодействие с документом)
-          if (document.hasFocus() && !audioPlayer.paused) {
-            await audioPlayer.play().catch(() => {});
-          }
-          
-          return true;
-          
-        } catch (err) {
-          console.error("Music generation error:", err);
-          retries++;
-          if (retries >= maxRetries) {
-            throw err;
-          }
-          await new Promise(resolve => setTimeout(resolve, 2000 * retries));
-        } finally {
-          musicLoader.classList.add("hidden");
+          data = await response.json();
+        } catch {
+          // Если вернули не JSON, создаём сами
+          data = { estimated_time: 20, message: "Модель загружается" };
         }
+        
+        const waitTime = Math.min((data.estimated_time || 20) * 1000, 60000);
+        musicLoaderText.textContent = `Модель загружается... (${Math.ceil(waitTime/1000)}с)`;
+        console.log(`⏳ Waiting ${waitTime}ms for model to load...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        retries++;
+        continue;
       }
-      return false;
+      
+      // 🚫 Обработка других ошибок
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        
+        // Пытаемся получить JSON с ошибкой
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          // Если вернули HTML, читаем как текст
+          const text = await response.text().catch(() => "");
+          console.error(`❌ Server returned non-JSON:`, text.substring(0, 200));
+          errorMessage = `Server error ${response.status} (вернут HTML вместо JSON)`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      // ✅ Успех — парсим JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseErr) {
+        console.error("Failed to parse JSON response:", parseErr);
+        throw new Error("Сервер вернул некорректный JSON");
+      }
+      
+      // ✅ Успех
+      generatedAudioUrl = data.audioUrl;
+      audioPlayer.src = `${generatedAudioUrl}`;
+      musicInfo.textContent = `${data.duration || duration}с • ${data.model?.split('/').pop() || 'MusicGen'}`;
+      musicPromptDisplay.textContent = prompt;
+      
+      audioPanel.classList.remove("hidden");
+      
+      return true;
+      
+    } catch (err) {
+      console.error("Music generation error:", err);
+      retries++;
+      
+      if (retries >= maxRetries) {
+        throw err;
+      }
+      
+      // Ждём перед повтором
+      await new Promise(resolve => setTimeout(resolve, 2000 * retries));
+    } finally {
+      musicLoader.classList.add("hidden");
     }
+  }
+  return false;
+}
 
     // 🎵 Обработчик кнопки музыки
     async function handleMusicToggle() {
