@@ -42,11 +42,11 @@
   </main>
 
   <script>
+    const API_BASE_URL = "https://story-axss.onrender.com";
     const storyDiv = document.getElementById("story");
     const choicesDiv = document.getElementById("choices");
     const img = document.getElementById("img");
     const imgLoader = document.getElementById("imgLoader");
-
     let currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
     let currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
 
@@ -73,11 +73,13 @@
     async function loadImage(prompt) {
       imgLoader.classList.remove("hidden");
       img.classList.add("opacity-0");
-      const r = await fetch("/api/image", {
+
+      const r = await fetch(`${API_BASE_URL}/api/image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })
       });
+
       const data = await r.json();
       img.src = data.imageUrl;
       img.onload = () => {
@@ -91,11 +93,12 @@
       storyDiv.innerHTML = "";
 
       if (choice) {
-        const r = await fetch("/api/story", {
+        const r = await fetch(`${API_BASE_URL}/api/story`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ currentText, choice })
         });
+
         const data = await r.json();
         currentText = data.text || currentText;
         currentImagePrompt = data.imagePrompt || currentImagePrompt;
