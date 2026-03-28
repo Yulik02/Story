@@ -12,32 +12,80 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .typing::after { content:'|'; animation:blink 1s infinite; }
     @keyframes blink { 50% { opacity:0; } }
+    
+    /* 🎵 Музыкальные стили */
+    .audio-wave { display:flex; gap:2px; align-items:center; height:20px; }
+    .audio-wave span { 
+      width:3px; background:#fbbf24; border-radius:2px; 
+      animation:wave 1s ease-in-out infinite; 
+    }
+    .audio-wave span:nth-child(2){ animation-delay:0.1s; height:12px; }
+    .audio-wave span:nth-child(3){ animation-delay:0.2s; height:16px; }
+    .audio-wave span:nth-child(4){ animation-delay:0.3s; height:10px; }
+    .audio-wave span:nth-child(5){ animation-delay:0.4s; height:14px; }
+    @keyframes wave { 0%,100%{ transform:scaleY(1); } 50%{ transform:scaleY(1.8); } }
+    
+    .music-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .music-playing .audio-wave span { animation-play-state:running; }
+    .music-paused .audio-wave span { animation-play-state:paused; }
   </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
   <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
     <div>
-      <h1 class="font-bold">NeuroStory</h1>
+      <h1 class="font-bold text-xl"><i class="fa-solid fa-brain mr-2"></i>NeuroStory</h1>
       <p id="status" class="text-xs text-green-400">AI активен</p>
     </div>
-    <button onclick="restart()" class="text-gray-300 hover:text-white">
-      <i class="fa-solid fa-rotate-right"></i>
-    </button>
+    <div class="flex items-center gap-3">
+      <!-- 🎵 Кнопка управления музыкой -->
+      <button id="musicToggle" class="music-btn px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm" title="Генерировать/воспроизвести музыку">
+        <i class="fa-solid fa-music"></i>
+        <span id="musicStatus">🎵 Музыка</span>
+      </button>
+      <button onclick="restart()" class="text-gray-300 hover:text-white p-2" title="Начать заново">
+        <i class="fa-solid fa-rotate-right"></i>
+      </button>
+    </div>
   </header>
 
   <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+    <!-- Изображение -->
     <section class="lg:w-2/3 bg-black flex flex-col justify-center items-center p-4">
       <div class="relative w-full max-w-2xl aspect-video bg-slate-900 rounded overflow-hidden border border-slate-700">
         <img id="img" class="w-full h-full object-cover opacity-0 transition-opacity duration-700" />
         <div id="imgLoader" class="absolute inset-0 flex items-center justify-center bg-black/80">
           <div class="loader"></div>
         </div>
+        <!-- 🎵 Индикатор генерации музыки -->
+        <div id="musicLoader" class="absolute bottom-3 right-3 bg-slate-800/90 px-3 py-1.5 rounded-full text-xs flex items-center gap-2 hidden">
+          <div class="audio-wave">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <span id="musicLoaderText">Генерация...</span>
+        </div>
       </div>
     </section>
 
+    <!-- Текст и выбор -->
     <section class="lg:w-1/3 flex flex-col bg-slate-900 border-l border-slate-800">
       <div id="story" class="flex-1 p-4 overflow-y-auto"></div>
       <div id="choices" class="p-4 bg-slate-800 border-t border-slate-700 space-y-2"></div>
+      
+      <!-- 🎵 Панель управления аудио -->
+      <div id="audioPanel" class="p-3 bg-slate-800/50 border-t border-slate-700 hidden">
+        <div class="flex items-center gap-3">
+          <audio id="audioPlayer" class="hidden"></audio>
+          <button id="playPauseBtn" class="p-2 rounded-full bg-slate-700 hover:bg-slate-600 transition">
+            <i class="fa-solid fa-play" id="playIcon"></i>
+          </button>
+          <div class="flex-1">
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" 
+                   class="w-full accent-fbbf24">
+          </div>
+          <span class="text-xs text-gray-400" id="musicInfo">—</span>
+        </div>
+        <p id="musicPromptDisplay" class="text-xs text-gray-500 mt-1 truncate"></p>
+      </div>
     </section>
   </main>
 
@@ -47,9 +95,55 @@
     const choicesDiv = document.getElementById("choices");
     const img = document.getElementById("img");
     const imgLoader = document.getElementById("imgLoader");
+    const musicLoader = document.getElementById("musicLoader");
+    const musicLoaderText = document.getElementById("musicLoaderText");
+    const musicToggle = document.getElementById("musicToggle");
+    const musicStatus = document.getElementById("musicStatus");
+    const audioPanel = document.getElementById("audioPanel");
+    const audioPlayer = document.getElementById("audioPlayer");
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const playIcon = document.getElementById("playIcon");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const musicInfo = document.getElementById("musicInfo");
+    const musicPromptDisplay = document.getElementById("musicPromptDisplay");
+    
     let currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
     let currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
+    let currentMusicPrompt = "ambient cyberpunk background, slow tempo";
+    let isMusicPlaying = false;
+    let generatedAudioUrl = null;
+    let musicGenerationPending = false;
 
+    // 🎵 Инициализация аудио
+    audioPlayer.volume = parseFloat(volumeSlider.value);
+    volumeSlider.addEventListener('input', (e) => {
+      audioPlayer.volume = parseFloat(e.target.value);
+    });
+    
+    playPauseBtn.addEventListener('click', toggleMusicPlayback);
+    musicToggle.addEventListener('click', handleMusicToggle);
+    
+    audioPlayer.addEventListener('play', () => {
+      isMusicPlaying = true;
+      playIcon.className = 'fa-solid fa-pause';
+      musicToggle.classList.add('music-playing');
+      musicToggle.classList.remove('music-paused');
+    });
+    
+    audioPlayer.addEventListener('pause', () => {
+      isMusicPlaying = false;
+      playIcon.className = 'fa-solid fa-play';
+      musicToggle.classList.add('music-paused');
+      musicToggle.classList.remove('music-playing');
+    });
+    
+    audioPlayer.addEventListener('ended', () => {
+      isMusicPlaying = false;
+      playIcon.className = 'fa-solid fa-play';
+      musicToggle.classList.remove('music-playing', 'music-paused');
+    });
+
+    // 🔤 Анимация текста
     async function typeText(text) {
       return new Promise(resolve => {
         const p = document.createElement("p");
@@ -70,43 +164,204 @@
       });
     }
 
+    // 🖼️ Загрузка изображения
     async function loadImage(prompt) {
       imgLoader.classList.remove("hidden");
       img.classList.add("opacity-0");
 
-      const r = await fetch(`${API_BASE_URL}/api/image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
-      });
+      try {
+        const r = await fetch(`${API_BASE_URL}/api/image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt })
+        });
 
-      const data = await r.json();
-      img.src = data.imageUrl;
-      img.onload = () => {
-        img.classList.remove("opacity-0");
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          console.warn("Image generation warning:", err);
+          // Fallback: не блокируем историю, если картинка не сгенерировалась
+          img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt)}/800/450`;
+        } else {
+          const data = await r.json();
+          img.src = data.imageUrl;
+        }
+        
+        img.onload = () => {
+          img.classList.remove("opacity-0");
+          imgLoader.classList.add("hidden");
+        };
+        img.onerror = () => {
+          imgLoader.classList.add("hidden");
+          console.error("Failed to load image");
+        };
+      } catch (e) {
+        console.error("Image fetch error:", e);
         imgLoader.classList.add("hidden");
-      };
+      }
     }
 
+    // 🎵 Генерация музыки через API
+    async function generateMusic(prompt, duration = 10, maxRetries = 3) {
+      let retries = 0;
+      
+      while (retries < maxRetries) {
+        try {
+          musicLoader.classList.remove("hidden");
+          musicLoaderText.textContent = retries > 0 ? `Повтор (${retries+1}/${maxRetries})...` : "Генерация...";
+          setMusicStatus("⏳ Генерация...", true);
+          
+          const response = await fetch(`${API_BASE_URL}/api/music`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, duration })
+          });
+          
+          const data = await response.json();
+          
+          // 🔄 Обработка 503 - модель загружается
+          if (response.status === 503) {
+            const waitTime = Math.min((data.estimated_time || 20) * 1000, 60000);
+            musicLoaderText.textContent = `Модель загружается... (${Math.ceil(waitTime/1000)}с)`;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            retries++;
+            continue;
+          }
+          
+          if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+          }
+          
+          // ✅ Успех
+          generatedAudioUrl = data.audioUrl;
+          audioPlayer.src = `data:${generatedAudioUrl}`;
+          musicInfo.textContent = `${data.duration || duration}с • ${data.model?.split('/').pop() || 'MusicGen'}`;
+          musicPromptDisplay.textContent = prompt;
+          
+          // Показать панель управления
+          audioPanel.classList.remove("hidden");
+          
+          // Авто-воспроизведение (если уже было взаимодействие с документом)
+          if (document.hasFocus() && !audioPlayer.paused) {
+            await audioPlayer.play().catch(() => {});
+          }
+          
+          return true;
+          
+        } catch (err) {
+          console.error("Music generation error:", err);
+          retries++;
+          if (retries >= maxRetries) {
+            throw err;
+          }
+          await new Promise(resolve => setTimeout(resolve, 2000 * retries));
+        } finally {
+          musicLoader.classList.add("hidden");
+        }
+      }
+      return false;
+    }
+
+    // 🎵 Обработчик кнопки музыки
+    async function handleMusicToggle() {
+      if (musicGenerationPending) return;
+      
+      // Если аудио уже сгенерировано - просто play/pause
+      if (generatedAudioUrl) {
+        toggleMusicPlayback();
+        return;
+      }
+      
+      // Генерация новой музыки
+      musicGenerationPending = true;
+      musicToggle.disabled = true;
+      
+      try {
+        const success = await generateMusic(currentMusicPrompt, 12);
+        if (success && !isMusicPlaying) {
+          await audioPlayer.play();
+        }
+      } catch (err) {
+        alert("❌ Не удалось сгенерировать музыку:\n" + (err.message || "Попробуйте позже"));
+        setMusicStatus("🎵 Ошибка", false);
+      } finally {
+        musicGenerationPending = false;
+        musicToggle.disabled = false;
+      }
+    }
+
+    // ▶️⏸ Play/Pause
+    function toggleMusicPlayback() {
+      if (!generatedAudioUrl) {
+        handleMusicToggle();
+        return;
+      }
+      
+      if (audioPlayer.paused) {
+        audioPlayer.play().catch(err => {
+          console.warn("Autoplay prevented:", err);
+          alert("🔊 Нажмите на страницу, чтобы включить звук");
+        });
+      } else {
+        audioPlayer.pause();
+      }
+    }
+
+    // 📊 Обновление статуса музыки
+    function setMusicStatus(text, loading = false) {
+      musicStatus.textContent = text;
+      musicToggle.disabled = loading || musicGenerationPending;
+      if (loading) {
+        musicToggle.classList.add("opacity-70");
+      } else {
+        musicToggle.classList.remove("opacity-70");
+      }
+    }
+
+    // 🎬 Загрузка сцены
     async function loadScene(choice = "") {
       choicesDiv.innerHTML = '<div class="flex justify-center py-4"><div class="loader"></div></div>';
       storyDiv.innerHTML = "";
+      setMusicStatus("🎵 Музыка", false);
 
       if (choice) {
-        const r = await fetch(`${API_BASE_URL}/api/story`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ currentText, choice })
-        });
+        try {
+          const r = await fetch(`${API_BASE_URL}/api/story`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ currentText, choice })
+          });
 
-        const data = await r.json();
-        currentText = data.text || currentText;
-        currentImagePrompt = data.imagePrompt || currentImagePrompt;
-        await loadImage(currentImagePrompt);
-        await typeText(currentText);
-        renderChoices(data.choices || []);
+          const data = await r.json();
+          currentText = data.text || currentText;
+          currentImagePrompt = data.imagePrompt || currentImagePrompt;
+          currentMusicPrompt = data.musicPrompt || currentMusicPrompt;
+          
+          // Параллельная загрузка изображения и (опционально) музыки
+          await Promise.all([
+            loadImage(currentImagePrompt),
+            // Авто-генерация музыки при смене сцены (раскомментируйте, если нужно):
+            // generateMusic(currentMusicPrompt, 10).catch(() => {})
+          ]);
+          
+          await typeText(currentText);
+          renderChoices(data.choices || []);
+          
+          // Обновить отображение промпта музыки
+          if (data.musicPrompt) {
+            musicPromptDisplay.textContent = `🎼 ${data.musicPrompt}`;
+          }
+          
+        } catch (err) {
+          console.error("Scene load error:", err);
+          storyDiv.innerHTML = "<p class='text-red-400'>Ошибка загрузки сцены. Попробуйте ещё раз.</p>";
+          renderChoices([{ text: "↻ Повторить", next: choice }]);
+        }
       } else {
-        await loadImage(currentImagePrompt);
+        // Стартовая сцена
+        await Promise.all([
+          loadImage(currentImagePrompt),
+          // generateMusic(currentMusicPrompt, 10).catch(() => {})
+        ]);
         await typeText(currentText);
         renderChoices([
           { text: "Достать устройство", next: "достать устройство" },
@@ -116,25 +371,48 @@
       }
     }
 
+    // 🔘 Отрисовка кнопок выбора
     function renderChoices(items) {
       choicesDiv.innerHTML = "";
       items.forEach(c => {
         const btn = document.createElement("button");
-        btn.className = "w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition border border-transparent";
+        btn.className = "w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition border border-transparent hover:border-fbbf24";
         btn.textContent = c.text;
         btn.onclick = () => loadScene(c.text);
         choicesDiv.appendChild(btn);
       });
     }
 
+    // 🔄 Перезапуск
     function restart() {
       currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
       currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
+      currentMusicPrompt = "ambient cyberpunk background, slow tempo";
+      
+      // Сброс аудио
+      audioPlayer.pause();
+      audioPlayer.src = "";
+      generatedAudioUrl = null;
+      audioPanel.classList.add("hidden");
+      setMusicStatus("🎵 Музыка", false);
+      
       storyDiv.innerHTML = "";
+      choicesDiv.innerHTML = "";
+      img.classList.add("opacity-0");
+      
       loadScene();
     }
 
-    loadScene();
+    // 🚀 Старт
+    document.addEventListener("DOMContentLoaded", () => {
+      // Разблокировать управление аудио после первого взаимодействия (обход autoplay policy)
+      document.addEventListener("click", () => {
+        if (audioPlayer.src && !audioPlayer.paused) return;
+        // Можно добавить подсказку пользователю
+      }, { once: true });
+      
+      loadScene();
+    });
   </script>
 </body>
 </html>
