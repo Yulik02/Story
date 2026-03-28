@@ -81,6 +81,7 @@
     let currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
     let currentMusicPrompt = "dark cyberpunk ambient, slow tempo, synthesizer";
     let isMusicPlaying = false;
+    let imageCache = new Map(); // Кэш изображений
     
     // 🎵 ГЕНЕРАТОР МУЗЫКИ (мягкий и атмосферный)
     let synth, padSynth, bassSynth, loop, reverb, delay, filter;
@@ -109,61 +110,83 @@
       });
     }
 
-    // 🖼️ Изображение (ИСПРАВЛЕНО)
+    // 🖼️ Генерация изображений ЧЕРЕЗ БРАУЗЕР (Pollinations.ai - бесплатно, без ключа)
     async function loadImage(prompt) {
       imgLoader.classList.remove("hidden");
       img.classList.add("opacity-0");
 
       try {
-        const r = await fetch(`${API_BASE_URL}/api/image`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt })
-        });
-
-        if (!r.ok) {
-          console.warn("Image API error:", r.status);
-          throw new Error("Image API error");
-        }
-        
-        const data = await r.json();
-        console.log("Image data received:", data.imageUrl ? "has imageUrl" : "no imageUrl");
-        
-        // Правильная обработка base64
-        if (data.imageUrl) {
-          // Если уже есть data:image - используем как есть
-          if (data.imageUrl.startsWith('data:image')) {
-            img.src = data.imageUrl;
-          } else if (data.imageUrl.startsWith('image/')) {
-            // Если начинается с image/png;base64 - добавляем data:
-            img.src = 'data:' + data.imageUrl;
-          } else {
-            // Иначе предполагаем что это base64
-            img.src = 'data:image/png;base64,' + data.imageUrl;
-          }
-          
+        // Проверяем кэш
+        const cacheKey = prompt.substring(0, 100);
+        if (imageCache.has(cacheKey)) {
+          console.log("✅ Loading from cache");
+          img.src = imageCache.get(cacheKey);
           img.onload = () => {
-            console.log("Image loaded successfully");
             img.classList.remove("opacity-0");
             imgLoader.classList.add("hidden");
           };
-          
-          img.onerror = (e) => {
-            console.error("Image load failed:", e);
-            imgLoader.classList.add("hidden");
-          };
-        } else {
-          throw new Error("No imageUrl in response");
+          return;
         }
+
+        // Используем Pollinations.ai (бесплатный AI image generator)
+        const encodedPrompt = encodeURIComponent(prompt + ", cinematic, high quality, detailed");
+        const width = 800;
+        const height = 450;
+        const seed = Math.floor(Math.random() * 10000);
+        
+        // URL для генерации изображения
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
+        
+        console.log("🎨 Generating image:", prompt);
+        
+        // Создаем Promise для загрузки
+        await new Promise((resolve, reject) => {
+          const testImg = new Image();
+          testImg.onload = () => {
+            console.log("✅ Image loaded successfully");
+            imageCache.set(cacheKey, imageUrl);
+            img.src = imageUrl;
+            img.classList.remove("opacity-0");
+            imgLoader.classList.add("hidden");
+            resolve();
+          };
+          testImg.onerror = () => {
+            console.warn("❌ Pollinations failed, trying fallback");
+            reject(new Error("Pollinations failed"));
+          };
+          testImg.src = imageUrl;
+          
+          // Таймаут 15 секунд
+          setTimeout(() => reject(new Error("Timeout")), 15000);
+        });
         
       } catch (e) {
-        console.error("Image error:", e);
-        // Fallback на placeholder
-        img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt.substring(0, 50))}/800/450`;
-        img.onload = () => {
+        console.error("Image generation error:", e);
+        
+        // Fallback 1: Picsum.photos с seed на основе промпта
+        try {
+          const seed = prompt.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+          const fallbackUrl = `https://picsum.photos/seed/${seed}/800/450`;
+          
+          await new Promise((resolve, reject) => {
+            const testImg = new Image();
+            testImg.onload = () => {
+              console.log("✅ Fallback image loaded");
+              img.src = fallbackUrl;
+              img.classList.remove("opacity-0");
+              imgLoader.classList.add("hidden");
+              resolve();
+            };
+            testImg.onerror = reject;
+            testImg.src = fallbackUrl;
+          });
+        } catch (fallbackError) {
+          // Fallback 2: Простой цветной placeholder
+          console.error("All image methods failed");
+          img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="450"%3E%3Crect fill="%231e293b" width="800" height="450"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="24" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
           img.classList.remove("opacity-0");
           imgLoader.classList.add("hidden");
-        };
+        }
       }
     }
 
@@ -176,8 +199,8 @@
         
         // Мягкий реверб
         reverb = new Tone.Reverb({ 
-          decay: 5,      // Длинный decay для атмосферы
-          wet: 0.5       // 50% эффекта
+          decay: 5,
+          wet: 0.5
         }).toDestination();
         
         // Delay для глубины
@@ -207,29 +230,29 @@
     function createSoftSynth() {
       return new Tone.PolySynth(Tone.Synth, {
         oscillator: { 
-          type: "triangle",  // Мягкая волна вместо sawtooth
-          count: 3           // Немного detune для ширины
+          type: "triangle",
+          count: 3
         },
         envelope: { 
-          attack: 0.8,    // Очень плавная атака (было 0.1)
-          decay: 0.5,     // Плавный спад
-          sustain: 0.6,   // Хорошая sustain
-          release: 2.5    // Долгий release для плавности (было 0.8)
+          attack: 0.8,
+          decay: 0.5,
+          sustain: 0.6,
+          release: 2.5
         },
-        volume: -15       // Тише (было -12)
+        volume: -15
       }).connect(filter);
     }
 
-    // 🎵 Создание pad-синтезатора (фоновая атмосфера)
+    // 🎵 Создание pad-синтезатора
     function createPadSynth() {
       return new Tone.PolySynth(Tone.AMSynth, {
         harmonicity: 2.5,
         oscillator: { type: "sine" },
         envelope: { 
-          attack: 1.5,    // Очень медленная атака
+          attack: 1.5,
           decay: 0.5, 
           sustain: 0.7, 
-          release: 3      // Очень долгий release
+          release: 3
         },
         modulation: { type: "square" },
         modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 },
@@ -274,21 +297,21 @@
 
       // Парсинг промпта
       const p = prompt.toLowerCase();
-      let tempo = 65;  // Медленнее (было 70-75)
-      let rootNote = 36; // C2
-      let scale = [0, 3, 7, 10]; // minor 7th - мягкий джазовый звук
+      let tempo = 65;
+      let rootNote = 36;
+      let scale = [0, 3, 7, 10];
       
       if (p.includes("calm") || p.includes("peaceful")) {
         tempo = 55; 
-        scale = [0, 4, 7, 11]; // major 7th - очень мягко
-        rootNote = 40; // E2
+        scale = [0, 4, 7, 11];
+        rootNote = 40;
       } else if (p.includes("tense") || p.includes("action")) {
         tempo = 85; 
-        scale = [0, 3, 6, 10]; // diminished - напряжённо но мягко
+        scale = [0, 3, 6, 10];
       } else if (p.includes("cyberpunk") || p.includes("dark") || p.includes("neon")) {
         tempo = 60; 
-        scale = [0, 3, 7, 9, 10]; // minor 9th - атмосферно
-        rootNote = 38; // D#2
+        scale = [0, 3, 7, 9, 10];
+        rootNote = 38;
       }
 
       currentParams = { tempo, scale, rootNote, prompt };
@@ -298,7 +321,7 @@
       padSynth = createPadSynth();
       bassSynth = createBassSynth();
 
-      // Генерация аккордов (вместо резких отдельных нот)
+      // Генерация аккордов
       const chords = [];
       for (let i = 0; i < 8; i++) {
         const interval1 = scale[Math.floor(Math.random() * scale.length)];
@@ -311,8 +334,8 @@
             rootNote + interval2 + 12,
             rootNote + interval3 + 12
           ],
-          duration: "2n",  // Длинные аккорды (было 8n)
-          time: i * 2      // Каждые 2 секунды
+          duration: "2n",
+          time: i * 2
         });
       }
 
@@ -320,20 +343,17 @@
       Tone.Transport.bpm.value = tempo;
       let chordIndex = 0;
 
-      // Мелодия - очень медленно и плавно
       loop = new Tone.Loop((time) => {
         if (chordIndex >= chords.length) chordIndex = 0;
         const chord = chords[chordIndex];
         
-        // Играем аккорд
         synth.triggerAttackRelease(
           chord.notes.map(n => Tone.Frequency(n).toNote()), 
           chord.duration, 
           time,
-          0.4  // velocity
+          0.4
         );
         
-        // Бас - только корневая нота
         if (chordIndex % 2 === 0) {
           bassSynth.triggerAttackRelease(
             Tone.Frequency(rootNote).toNote(),
@@ -343,7 +363,6 @@
           );
         }
         
-        // Pad - фоновые длинные ноты
         if (chordIndex % 4 === 0) {
           padSynth.triggerAttackRelease(
             [Tone.Frequency(rootNote + 12).toNote(), Tone.Frequency(rootNote + 19).toNote()],
@@ -354,7 +373,7 @@
         }
         
         chordIndex++;
-      }, "2n").start(0);  // Каждую половину такта
+      }, "2n").start(0);
 
       Tone.Transport.start();
       isPlaying = true;
@@ -456,7 +475,8 @@
           currentImagePrompt = data.imagePrompt || currentImagePrompt;
           currentMusicPrompt = data.musicPrompt || currentMusicPrompt;
           
-          await Promise.all([loadImage(currentImagePrompt)]);
+          // Загружаем только изображение (браузерная генерация)
+          await loadImage(currentImagePrompt);
           await typeText(currentText);
           renderChoices(data.choices || []);
           
@@ -496,6 +516,7 @@
       currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
       currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
       currentMusicPrompt = "dark cyberpunk ambient, slow tempo, synthesizer";
+      imageCache.clear(); // Очищаем кэш
       
       audioPanel.classList.add("hidden");
       isMusicPlaying = false;
