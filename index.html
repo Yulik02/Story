@@ -252,528 +252,239 @@
       }
     }
 
-    // 🎵 БРАУЗЕРНЫЙ ГЕНЕРАТОР МУЗЫКИ (Web Audio API + Tone.js)
-    // 🎵 ПРОДВИНУТЫЙ ГЕНЕРАТОР МУЗЫКИ (длинные композиции)
-class BrowserMusicGenerator {
-  constructor() {
-    this.isInitialized = false;
-    this.isPlaying = false;
-    this.currentPrompt = "";
-    
-    // Аудио-ноды
-    this.nodes = {
-      master: null,
-      reverb: null,
-      delay: null,
-      filter: null,
-      compressor: null
-    };
-    
-    // Синтезаторы
-    this.synths = {
-      pad: null,
-      lead: null,
-      bass: null,
-      percussion: null,
-      drone: null
-    };
-    
-    // Управление
-    this.transport = null;
-    this.parts = [];
-    this.currentSection = 0;
-    this.totalDuration = 45; // Секунд (можно менять)
-  }
+    class BrowserMusicGenerator {
+      constructor() {
+        this.isInitialized = false;
+        this.isPlaying = false;
+        this.currentPrompt = "";
+        this.nodes = { master: null, reverb: null, delay: null, filter: null, compressor: null };
+        this.synths = { pad: null, lead: null, bass: null, percussion: null, drone: null };
+        this.parts = [];
+        this.totalDuration = 45;
+      }
 
-  // Инициализация аудио-контекста
-  async init() {
-    if (this.isInitialized) return true;
-    
-    try {
-      await Tone.start();
-      
-      // Мастер-канал с компрессором
-      this.nodes.compressor = new Tone.Compressor({ threshold: -24, ratio: 4 }).toDestination();
-      this.nodes.master = this.nodes.compressor;
-      
-      // Эффекты
-      this.nodes.reverb = new Tone.Reverb({ decay: 6, wet: 0.4, preDelay: 0.05 }).connect(this.nodes.master);
-      this.nodes.delay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.35, wet: 0.25 }).connect(this.nodes.reverb);
-      this.nodes.filter = new Tone.Filter({ frequency: 4000, type: "lowpass", rolloff: -24 }).connect(this.nodes.delay);
-      
-      this.isInitialized = true;
-      console.log("🎵 Audio engine initialized");
-      return true;
-    } catch (err) {
-      console.error("❌ Audio init failed:", err);
-      return false;
-    }
-  }
+      async init() {
+        if (this.isInitialized) return true;
+        try {
+          await Tone.start();
+          this.nodes.compressor = new Tone.Compressor({ threshold: -24, ratio: 4 }).toDestination();
+          this.nodes.master = this.nodes.compressor;
+          this.nodes.reverb = new Tone.Reverb({ decay: 6, wet: 0.4, preDelay: 0.05 }).connect(this.nodes.master);
+          this.nodes.delay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.35, wet: 0.25 }).connect(this.nodes.reverb);
+          this.nodes.filter = new Tone.Filter({ frequency: 4000, type: "lowpass", rolloff: -24 }).connect(this.nodes.delay);
+          this.isInitialized = true;
+          console.log("🎵 Audio engine initialized");
+          return true;
+        } catch (err) {
+          console.error("❌ Audio init failed:", err);
+          return false;
+        }
+      }
 
-  // Парсинг промпта → параметры композиции
-  parsePrompt(prompt) {
-    const p = prompt.toLowerCase();
-    
-    // Базовые параметры
-    const params = {
-      tempo: 65,
-      key: "C",
-      scale: "minor",
-      mood: "ambient",
-      intensity: 0.4,
-      sections: ["intro", "build", "main", "outro"],
-      instruments: ["pad", "drone"]
-    };
-    
-    // Темп
-    if (p.includes("fast") || p.includes("action") || p.includes("tense")) params.tempo = 95;
-    else if (p.includes("slow") || p.includes("calm") || p.includes("peaceful")) params.tempo = 55;
-    else if (p.includes("cyberpunk") || p.includes("neon") || p.includes("dark")) params.tempo = 70;
-    
-    // Тональность и лад
-    if (p.includes("happy") || p.includes("hopeful") || p.includes("major")) {
-      params.scale = "major";
-      params.key = "D";
-    } else if (p.includes("mysterious") || p.includes("exotic")) {
-      params.scale = "phrygian";
-      params.key = "E";
-    } else if (p.includes("dark") || p.includes("cyberpunk") || p.includes("neon")) {
-      params.scale = "dorian";
-      params.key = "D#";
-    }
-    
-    // Настроение и интенсивность
-    if (p.includes("tense") || p.includes("suspense")) {
-      params.mood = "tense";
-      params.intensity = 0.7;
-      params.sections = ["intro", "build", "climax", "outro"];
-    } else if (p.includes("epic") || p.includes("cinematic")) {
-      params.mood = "epic";
-      params.intensity = 0.8;
-      params.sections = ["intro", "build", "main", "climax", "outro"];
-      params.instruments.push("percussion", "lead");
-    } else if (p.includes("calm") || p.includes("peaceful")) {
-      params.mood = "calm";
-      params.intensity = 0.2;
-      params.sections = ["intro", "main", "outro"];
-    }
-    
-    // Инструменты
-    if (p.includes("piano") || p.includes("keys")) params.instruments.push("lead");
-    if (p.includes("bass") || p.includes("low")) params.instruments.push("bass");
-    if (p.includes("drums") || p.includes("beat") || p.includes("rhythm")) params.instruments.push("percussion");
-    if (p.includes("drone") || p.includes("ambient") || p.includes("atmosphere")) params.instruments.push("drone");
-    if (p.includes("synth") || p.includes("electronic")) {
-      if (!params.instruments.includes("pad")) params.instruments.push("pad");
-    }
-    
-    // Убираем дубликаты
-    params.instruments = [...new Set(params.instruments)];
-    
-    return params;
-  }
+      parsePrompt(prompt) {
+        const p = prompt.toLowerCase();
+        const params = {
+          tempo: 65, key: "C", scale: "minor", mood: "ambient",
+          intensity: 0.4, sections: ["intro", "build", "main", "outro"],
+          instruments: ["pad", "drone"]
+        };
+        if (p.includes("fast") || p.includes("action") || p.includes("tense")) params.tempo = 95;
+        else if (p.includes("slow") || p.includes("calm") || p.includes("peaceful")) params.tempo = 55;
+        else if (p.includes("cyberpunk") || p.includes("neon") || p.includes("dark")) params.tempo = 70;
+        if (p.includes("happy") || p.includes("hopeful") || p.includes("major")) { params.scale = "major"; params.key = "D"; }
+        else if (p.includes("mysterious") || p.includes("exotic")) { params.scale = "phrygian"; params.key = "E"; }
+        else if (p.includes("dark") || p.includes("cyberpunk") || p.includes("neon")) { params.scale = "dorian"; params.key = "D#"; }
+        if (p.includes("tense") || p.includes("suspense")) { params.mood = "tense"; params.intensity = 0.7; params.sections = ["intro", "build", "climax", "outro"]; }
+        else if (p.includes("epic") || p.includes("cinematic")) { params.mood = "epic"; params.intensity = 0.8; params.sections = ["intro", "build", "main", "climax", "outro"]; params.instruments.push("percussion", "lead"); }
+        else if (p.includes("calm") || p.includes("peaceful")) { params.mood = "calm"; params.intensity = 0.2; params.sections = ["intro", "main", "outro"]; }
+        if (p.includes("piano") || p.includes("keys")) params.instruments.push("lead");
+        if (p.includes("bass") || p.includes("low")) params.instruments.push("bass");
+        if (p.includes("drums") || p.includes("beat") || p.includes("rhythm")) params.instruments.push("percussion");
+        if (p.includes("drone") || p.includes("ambient") || p.includes("atmosphere")) params.instruments.push("drone");
+        if (p.includes("synth") || p.includes("electronic")) { if (!params.instruments.includes("pad")) params.instruments.push("pad"); }
+        params.instruments = [...new Set(params.instruments)];
+        return params;
+      }
 
-  // Генерация нотной последовательности
-  generateSequence(params, length, section = "main") {
-    const scales = {
-      major: [0, 2, 4, 5, 7, 9, 11],
-      minor: [0, 2, 3, 5, 7, 8, 10],
-      dorian: [0, 2, 3, 5, 7, 9, 10],
-      phrygian: [0, 1, 4, 5, 7, 8, 10]
-    };
-    const scale = scales[params.scale] || scales.minor;
-    const root = this.noteToMidi(params.key + "3");
-    
-    const sequence = [];
-    
-    for (let i = 0; i < length; i++) {
-      // Разная плотность для разных секций
-      const density = section === "intro" ? 0.3 : section === "build" ? 0.6 : section === "climax" ? 0.9 : 0.5;
-      
-      if (Math.random() > (1 - density)) {
-        const interval = scale[Math.floor(Math.random() * scale.length)];
-        const octave = Math.random() > 0.7 ? 12 : 0;
-        const velocity = 0.3 + Math.random() * (params.intensity * 0.5);
-        
-        // Длительность: длинные ноты в intro/outro, короткие в climax
-        const durations = section === "climax" ? ["8n", "16n"] : section === "intro" || section === "outro" ? ["2n", "4n"] : ["4n", "8n"];
-        
-        sequence.push({
-          note: root + interval + octave,
-          duration: durations[Math.floor(Math.random() * durations.length)],
-          velocity: Math.min(velocity, 1),
-          time: i * 0.5
+      noteToMidi(note) {
+        const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const match = note.match(/^([A-G]#?)(\d)$/);
+        if (!match) return 60;
+        const [, name, octave] = match;
+        return notes.indexOf(name) + 12 * (parseInt(octave) + 1);
+      }
+
+      generateChords(params, count, section) {
+        const scales = { major: [0, 4, 7], minor: [0, 3, 7], dorian: [0, 3, 7], phrygian: [0, 3, 6] };
+        const triad = scales[params.scale] || scales.minor;
+        const root = this.noteToMidi(params.key + "3");
+        const chords = [];
+        const progressions = { ambient: [0, 5, 3, 6], tense: [0, 2, 5, 3], epic: [0, 4, 5, 1], calm: [0, 3, 5, 4] };
+        const progression = progressions[params.mood] || progressions.ambient;
+        for (let i = 0; i < count; i++) {
+          const rootOffset = progression[i % progression.length] * 2;
+          const notes = triad.map(interval => root + rootOffset + interval);
+          const duration = section === "intro" || section === "outro" ? "2n" : "1n";
+          const release = section === "outro" ? 4 : section === "intro" ? 2 : 1.5;
+          chords.push({ notes: notes.map(n => Tone.Frequency(n).toNote()), duration, release, time: i * 4 });
+        }
+        return chords;
+      }
+
+      createSynths(params) {
+        if (params.instruments.includes("pad")) {
+          this.synths.pad = new Tone.PolySynth(Tone.AMSynth, {
+            harmonicity: 3, oscillator: { type: "sine", count: 2, spread: 30 },
+            envelope: { attack: 1.5, decay: 0.5, sustain: 0.8, release: 3 },
+            modulation: { type: "triangle", frequency: 0.3 },
+            modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }, volume: -18
+          }).connect(this.nodes.filter);
+        }
+        if (params.instruments.includes("lead")) {
+          this.synths.lead = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: params.mood === "dark" ? "sawtooth" : "triangle", count: 2, spread: 15 },
+            envelope: { attack: 0.3, decay: 0.4, sustain: 0.5, release: 1.2 }, volume: -14
+          }).connect(this.nodes.delay);
+        }
+        if (params.instruments.includes("bass")) {
+          this.synths.bass = new Tone.MonoSynth({
+            oscillator: { type: "sine" },
+            filter: { Q: 2, type: "lowpass", rolloff: -24, frequency: 500 },
+            envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.8 },
+            filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.7, baseFrequency: 80, octaves: 2.5 }, volume: -16
+          }).connect(this.nodes.reverb);
+        }
+        if (params.instruments.includes("percussion")) {
+          this.synths.percussion = new Tone.MembraneSynth({
+            pitchDecay: 0.03, octaves: 1.5, oscillator: { type: "triangle" },
+            envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.2 }, volume: -20
+          }).connect(this.nodes.master);
+        }
+        if (params.instruments.includes("drone")) {
+          this.synths.drone = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "sine", count: 3, spread: 10 },
+            envelope: { attack: 2, decay: 0, sustain: 0.6, release: 4 }, volume: -24
+          }).connect(this.nodes.reverb);
+          const droneNote = Tone.Frequency(this.noteToMidi(params.key + "2")).toNote();
+          this.synths.drone.triggerAttack(droneNote, Tone.now(), 0.4);
+          this.synths.drone.triggerRelease(Tone.now() + this.totalDuration + 5);
+        }
+      }
+
+      createSection(params, sectionName, startTime, duration) {
+        const beats = Math.floor(duration * params.tempo / 60);
+        const parts = [];
+        if (this.synths.pad) {
+          const chords = this.generateChords(params, Math.ceil(beats / 4), sectionName);
+          const padPart = new Tone.Part((time, chord) => {
+            const intensity = sectionName === "climax" ? 0.6 : sectionName === "build" ? 0.4 : 0.3;
+            this.synths.pad.triggerAttackRelease(chord.notes, chord.duration, time, intensity);
+          }, chords.map(c => [c.time + startTime, c])).start(0);
+          parts.push(padPart);
+        }
+        if (this.synths.lead && sectionName !== "intro" && sectionName !== "outro") {
+          const melody = [];
+          const scale = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], dorian: [0, 2, 3, 5, 7, 9, 10], phrygian: [0, 1, 4, 5, 7, 8, 10] }[params.scale] || [0, 2, 3, 5, 7, 8, 10];
+          const root = this.noteToMidi(params.key + "4");
+          for (let i = 0; i < beats; i++) {
+            if (Math.random() > 0.4) {
+              const interval = scale[Math.floor(Math.random() * scale.length)];
+              melody.push({ note: root + interval, duration: "8n", time: i });
+            }
+          }
+          const leadPart = new Tone.Part((time, note) => {
+            this.synths.lead.triggerAttackRelease(Tone.Frequency(note.note).toNote(), note.duration, time + startTime, 0.4);
+          }, melody.map(n => [n.time, n])).start(0);
+          parts.push(leadPart);
+        }
+        if (this.synths.bass) {
+          const bassNotes = [];
+          const bassRoot = this.noteToMidi(params.key + "2");
+          for (let i = 0; i < beats / 2; i++) {
+            bassNotes.push({ note: Tone.Frequency(bassRoot).toNote(), time: i * 2, duration: "1n" });
+          }
+          const bassPart = new Tone.Part((time, note) => {
+            this.synths.bass.triggerAttackRelease(note.note, note.duration, time + startTime, 0.5);
+          }, bassNotes.map(n => [n.time, n])).start(0);
+          parts.push(bassPart);
+        }
+        if (this.synths.percussion && (sectionName === "build" || sectionName === "climax" || sectionName === "main")) {
+          const percPattern = sectionName === "climax" ? [0, 0.5, 1, 1.5] : [0, 1, 2, 3];
+          const percPart = new Tone.Part((time) => {
+            this.synths.percussion.triggerAttackRelease("C2", "16n", time + startTime, 0.4);
+          }, percPattern.map(t => [t, null])).start(0);
+          parts.push(percPart);
+        }
+        return parts;
+      }
+
+      scheduleComposition(params) {
+        const sections = params.sections;
+        const sectionDurations = { intro: 8, build: 10, main: 15, climax: 8, outro: 10 };
+        let currentTime = 0;
+        if (this.nodes.filter) {
+          this.nodes.filter.frequency.setValueAtTime(500, Tone.now());
+          this.nodes.filter.frequency.linearRampToValueAtTime(4000, Tone.now() + 10);
+        }
+        sections.forEach((sectionName) => {
+          const duration = sectionDurations[sectionName] || 10;
+          const newParts = this.createSection(params, sectionName, currentTime, duration);
+          this.parts.push(...newParts);
+          currentTime += duration;
         });
+        return currentTime;
       }
-    }
-    
-    return sequence;
-  }
 
-  // Генерация аккордов для пада
-  generateChords(params, count, section) {
-    const scales = {
-      major: [0, 4, 7],
-      minor: [0, 3, 7],
-      dorian: [0, 3, 7],
-      phrygian: [0, 3, 6]
-    };
-    const triad = scales[params.scale] || scales.minor;
-    const root = this.noteToMidi(params.key + "3");
-    
-    const chords = [];
-    const progressions = {
-      ambient: [0, 5, 3, 6],
-      tense: [0, 2, 5, 3],
-      epic: [0, 4, 5, 1],
-      calm: [0, 3, 5, 4]
-    };
-    const progression = progressions[params.mood] || progressions.ambient;
-    
-    for (let i = 0; i < count; i++) {
-      const rootOffset = progression[i % progression.length] * 2; // Шаг квинтами
-      const notes = triad.map(interval => root + rootOffset + interval);
-      
-      // Вариации для разных секций
-      const duration = section === "intro" || section === "outro" ? "2n" : "1n";
-      const release = section === "outro" ? 4 : section === "intro" ? 2 : 1.5;
-      
-      chords.push({
-        notes: notes.map(n => Tone.Frequency(n).toNote()),
-        duration: duration,
-        release: release,
-        time: i * 4
-      });
-    }
-    
-    return chords;
-  }
+      async generateAndPlay(prompt, duration = 45) {
+        if (!await this.init()) throw new Error("Не удалось инициализировать аудио");
+        this.stop();
+        this.totalDuration = Math.max(30, Math.min(duration, 90));
+        this.currentPrompt = prompt;
+        const params = this.parsePrompt(prompt);
+        console.log(`🎵 Generating ${this.totalDuration}s composition: "${prompt}"`);
+        this.createSynths(params);
+        this.scheduleComposition(params);
+        Tone.Transport.bpm.value = params.tempo;
+        Tone.Transport.start();
+        this.isPlaying = true;
+        setTimeout(() => { if (this.isPlaying) this.fadeOut(3); }, this.totalDuration * 1000);
+        return { duration: this.totalDuration, params, sections: params.sections };
+      }
 
-  // Создание синтезаторов
-  createSynths(params) {
-    // Pad — атмосферный фон
-    if (params.instruments.includes("pad")) {
-      this.synths.pad = new Tone.PolySynth(Tone.AMSynth, {
-        harmonicity: 3,
-        oscillator: { type: "sine", count: 2, spread: 30 },
-        envelope: { attack: 1.5, decay: 0.5, sustain: 0.8, release: 3 },
-        modulation: { type: "triangle", frequency: 0.3 },
-        modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 },
-        volume: -18
-      }).connect(this.nodes.filter);
-    }
-    
-    // Lead — мелодия
-    if (params.instruments.includes("lead")) {
-      this.synths.lead = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: params.mood === "dark" ? "sawtooth" : "triangle", count: 2, spread: 15 },
-        envelope: { attack: 0.3, decay: 0.4, sustain: 0.5, release: 1.2 },
-        volume: -14
-      }).connect(this.nodes.delay);
-    }
-    
-    // Bass — низкие частоты
-    if (params.instruments.includes("bass")) {
-      this.synths.bass = new Tone.MonoSynth({
-        oscillator: { type: "sine" },
-        filter: { Q: 2, type: "lowpass", rolloff: -24, frequency: 500 },
-        envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 0.8 },
-        filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.7, baseFrequency: 80, octaves: 2.5 },
-        volume: -16
-      }).connect(this.nodes.reverb);
-    }
-    
-    // Percussion — мягкая перкуссия
-    if (params.instruments.includes("percussion")) {
-      this.synths.percussion = new Tone.MembraneSynth({
-        pitchDecay: 0.03,
-        octaves: 1.5,
-        oscillator: { type: "triangle" },
-        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.2 },
-        volume: -20
-      }).connect(this.nodes.master);
-    }
-    
-    // Drone — постоянный фон
-    if (params.instruments.includes("drone")) {
-      this.synths.drone = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: "sine", count: 3, spread: 10 },
-        envelope: { attack: 2, decay: 0, sustain: 0.6, release: 4 },
-        volume: -24
-      }).connect(this.nodes.reverb);
-      
-      // Запускаем дрон сразу на всю композицию
-      const droneNote = Tone.Frequency(this.noteToMidi(params.key + "2")).toNote();
-      this.synths.drone.triggerAttack(droneNote, Tone.now(), 0.4);
-      this.synths.drone.triggerRelease(Tone.now() + this.totalDuration + 5);
-    }
-  }
-
-  // Создание секции композиции
-  createSection(params, sectionName, startTime, duration) {
-    const beats = Math.floor(duration * params.tempo / 60);
-    const parts = [];
-    
-    // Pad аккорды
-    if (this.synths.pad) {
-      const chords = this.generateChords(params, Math.ceil(beats / 4), sectionName);
-      const padPart = new Tone.Part((time, chord) => {
-        // Динамика громкости по секциям
-        const intensity = sectionName === "climax" ? 0.6 : sectionName === "build" ? 0.4 : 0.3;
-        this.synths.pad.triggerAttackRelease(chord.notes, chord.duration, time, intensity);
-      }, chords.map(c => [c.time + startTime, c])).start(0);
-      parts.push(padPart);
-    }
-    
-    // Lead мелодия
-    if (this.synths.lead && sectionName !== "intro" && sectionName !== "outro") {
-      const melody = this.generateSequence(params, beats * 2, sectionName);
-      const leadPart = new Tone.Part((time, note) => {
-        const velocity = note.velocity * (sectionName === "climax" ? 1.2 : 1);
-        this.synths.lead.triggerAttackRelease(Tone.Frequency(note.note).toNote(), note.duration, time, velocity);
-      }, melody.map(n => [n.time + startTime, n])).start(0);
-      parts.push(leadPart);
-    }
-    
-    // Bass
-    if (this.synths.bass) {
-      const bassNotes = [];
-      const bassRoot = this.noteToMidi(params.key + "2");
-      for (let i = 0; i < beats / 2; i++) {
-        bassNotes.push({
-          note: Tone.Frequency(bassRoot).toNote(),
-          time: i * 2,
-          duration: "1n"
+      fadeOut(seconds = 3) {
+        const now = Tone.now();
+        [this.synths.pad, this.synths.lead, this.synths.bass].forEach(synth => {
+          if (synth) synth.volume.linearRampToValueAtTime(-60, now + seconds);
         });
+        setTimeout(() => this.stop(), seconds * 1000);
       }
-      const bassPart = new Tone.Part((time, note) => {
-        this.synths.bass.triggerAttackRelease(note.note, note.duration, time, 0.5);
-      }, bassNotes.map(n => [n.time + startTime, n])).start(0);
-      parts.push(bassPart);
-    }
-    
-    // Percussion
-    if (this.synths.percussion && (sectionName === "build" || sectionName === "climax" || sectionName === "main")) {
-      const percPattern = sectionName === "climax" ? [0, 0.5, 1, 1.5] : [0, 1, 2, 3];
-      const percPart = new Tone.Part((time) => {
-        this.synths.percussion.triggerAttackRelease("C2", "16n", time, 0.4);
-      }, percPattern.map(t => [t + startTime, null])).start(0);
-      parts.push(percPart);
-    }
-    
-    return parts;
-  }
 
-  // Планирование всей композиции
-  scheduleComposition(params) {
-    const sections = params.sections;
-    const sectionDurations = {
-      intro: 8,
-      build: 10,
-      main: 15,
-      climax: 8,
-      outro: 10
-    };
-    
-    let currentTime = 0;
-    
-    // Фильтр: плавное открытие в начале
-    if (this.nodes.filter) {
-      this.nodes.filter.frequency.setValueAtTime(500, Tone.now());
-      this.nodes.filter.frequency.linearRampToValueAtTime(4000, Tone.now() + 10);
-    }
-    
-    // Создаём каждую секцию
-    sections.forEach((sectionName, index) => {
-      const duration = sectionDurations[sectionName] || 10;
-      const newParts = this.createSection(params, sectionName, currentTime, duration);
-      this.parts.push(...newParts);
-      
-      // Динамика фильтра между секциями
-      if (this.nodes.filter) {
-        const targetFreq = sectionName === "climax" ? 6000 : sectionName === "build" ? 4500 : 3000;
-        this.nodes.filter.frequency.linearRampToValueAtTime(targetFreq, Tone.now() + currentTime + duration);
+      stop() {
+        this.parts.forEach(part => { part.stop(); part.dispose(); });
+        this.parts = [];
+        Object.values(this.synths).forEach(synth => { if (synth) { synth.releaseAll(); synth.dispose(); } });
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        this.isPlaying = false;
       }
-      
-      currentTime += duration;
-    });
-    
-    // Финальное затухание
-    if (this.nodes.master) {
-      this.nodes.compressor.rampTo(-6, 0.5);
-    }
-    
-    return currentTime;
-  }
 
-  // 🎵 Главная функция: генерация и воспроизведение
-  async generateAndPlay(prompt, duration = 45) {
-    if (!await this.init()) {
-      throw new Error("Не удалось инициализировать аудио");
-    }
-    
-    this.stop();
-    this.totalDuration = Math.max(30, Math.min(duration, 90));
-    this.currentPrompt = prompt;
-    
-    const params = this.parsePrompt(prompt);
-    console.log(`🎵 Generating ${this.totalDuration}s composition: "${prompt}"`);
-    console.log(`   → ${params.tempo}BPM, ${params.key} ${params.scale}, ${params.sections.join(' → ')}`);
-    
-    // Создаём синтезаторы
-    this.createSynths(params);
-    
-    // Планируем композицию
-    const actualDuration = this.scheduleComposition(params);
-    
-    // Запускаем
-    Tone.Transport.bpm.value = params.tempo;
-    Tone.Transport.start();
-    this.isPlaying = true;
-    
-    // Авто-остановка
-    setTimeout(() => {
-      if (this.isPlaying) this.fadeOut(3);
-    }, this.totalDuration * 1000);
-    
-    return { 
-      duration: this.totalDuration, 
-      params,
-      sections: params.sections 
-    };
-  }
-
-  // Плавное затухание
-  fadeOut(seconds = 3) {
-    if (!this.synths.pad && !this.synths.lead && !this.synths.bass) return;
-    
-    const now = Tone.now();
-    [this.synths.pad, this.synths.lead, this.synths.bass].forEach(synth => {
-      if (synth) {
-        synth.volume.linearRampToValueAtTime(-60, now + seconds);
+      togglePause() {
+        if (!this.isInitialized) return false;
+        if (Tone.Transport.state === "started") { Tone.Transport.pause(); this.isPlaying = false; }
+        else if (Tone.Transport.state === "paused") { Tone.Transport.start(); this.isPlaying = true; }
+        return this.isPlaying;
       }
-    });
-    
-    setTimeout(() => this.stop(), seconds * 1000);
-  }
 
-  // Остановка и очистка
-  stop() {
-    // Останавливаем части
-    this.parts.forEach(part => {
-      part.stop();
-      part.dispose();
-    });
-    this.parts = [];
-    
-    // Освобождаем синтезаторы
-    Object.values(this.synths).forEach(synth => {
-      if (synth) {
-        synth.releaseAll();
-        synth.dispose();
+      setVolume(value) {
+        const db = value === 0 ? -60 : Tone.gainToDb(value);
+        if (this.synths.pad) this.synths.pad.volume.rampTo(db - 4, 0.1);
+        if (this.synths.lead) this.synths.lead.volume.rampTo(db, 0.1);
+        if (this.synths.bass) this.synths.bass.volume.rampTo(db - 2, 0.1);
       }
-    });
-    
-    // Транспорт
-    Tone.Transport.stop();
-    Tone.Transport.cancel();
-    
-    this.isPlaying = false;
-  }
-
-  // Пауза/возобновление
-  togglePause() {
-    if (!this.isInitialized) return false;
-    
-    if (Tone.Transport.state === "started") {
-      Tone.Transport.pause();
-      this.isPlaying = false;
-    } else if (Tone.Transport.state === "paused") {
-      Tone.Transport.start();
-      this.isPlaying = true;
-    }
-    return this.isPlaying;
-  }
-
-  // Громкость
-  setVolume(value) {
-    const db = value === 0 ? -60 : Tone.gainToDb(value);
-    if (this.synths.pad) this.synths.pad.volume.rampTo(db - 4, 0.1);
-    if (this.synths.lead) this.synths.lead.volume.rampTo(db, 0.1);
-    if (this.synths.bass) this.synths.bass.volume.rampTo(db - 2, 0.1);
-  }
-
-  // Вспомогательная: MIDI из ноты
-  noteToMidi(note) {
-    const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-    const match = note.match(/^([A-G]#?)(\d)$/);
-    if (!match) return 60;
-    const [, name, octave] = match;
-    return notes.indexOf(name) + 12 * (parseInt(octave) + 1);
-  }
-}
-
-// Глобальный экземпляр
-const browserMusic = new BrowserMusicGenerator();
-
-
-    // 🎵 Обработчики управления
-    volumeSlider.addEventListener('input', (e) => {
-      browserMusic?.setVolume(parseFloat(e.target.value));
-    });
-
-    playPauseBtn.addEventListener('click', () => {
-      if (!browserMusic?.isInitialized) {
-        handleMusicToggle();
-        return;
-      }
-      const playing = browserMusic.togglePause();
-      updateMusicUI(playing);
-    });
-
-    musicToggle.addEventListener('click', handleMusicToggle);
-
-    // 🎵 UI обновления
-    function updateMusicUI(playing) {
-      isMusicPlaying = playing;
-      playIcon.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play';
-      musicToggle.classList.toggle('music-playing', playing);
-      musicToggle.classList.toggle('music-paused', !playing && browserMusic?.isInitialized);
     }
 
-    function setMusicStatus(text, loading = false) {
-      musicStatus.textContent = text;
-      musicToggle.disabled = loading || musicGenerationPending;
-      musicToggle.classList.toggle("opacity-70", loading);
-    }
-
-    // 🎵 Обработчик кнопки музыки
-    async function handleMusicToggle() {
-  if (musicGenerationPending) return;
-  
-  musicGenerationPending = true;
-  musicToggle.disabled = true;
-  musicStatus.textContent = "⏳ Генерация...";
-  
-  try {
-    // Генерируем 45-секундную композицию
-    const result = await browserMusic.generateAndPlay(currentMusicPrompt, 45);
-    
-    audioPanel.classList.remove("hidden");
-    musicInfo.textContent = `${result.duration}с • ${result.params.tempo}BPM • ${result.sections.join(' → ')}`;
-    musicPromptDisplay.textContent = currentMusicPrompt;
-    musicStatus.textContent = "🎵 Играет";
-    updateMusicUI(true);
-    
-  } catch (err) {
-    console.error("Music error:", err);
-    alert("❌ Ошибка музыки:\n" + err.message);
-    musicStatus.textContent = "🎵 Ошибка";
-  } finally {
-    musicGenerationPending = false;
-    musicToggle.disabled = false;
-  }
-}
+    // 🎵 Единственный экземпляр генератора
+    const browserMusic = new BrowserMusicGenerator();
 
 
     // 🎬 Загрузка сцены
