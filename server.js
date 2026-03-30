@@ -94,7 +94,7 @@ app.post("/api/story", async (req, res) => {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    model: "meta-llama/Llama-3.1-8B-Instruct:nscale",
+                    model: "meta-llama/Llama-3.3-70B-Instruct",
                     messages: history,
                     temperature: 0.7,
                     max_tokens: 500,
