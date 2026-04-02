@@ -502,7 +502,7 @@
         } else {
           const data = await r.json();
           const base64Payload = JSON.parse(window.atob(data.imageUrl.split(",")[1])).data[0]["b64_json"];
-          img.src = `image/png;base64,${base64Payload}`;
+          img.src = `data:image/png;base64,${base64Payload}`;
         }
 
         img.onload = () => {
