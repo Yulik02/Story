@@ -41,7 +41,6 @@
       }
     }
 
-    /* 🎵 Музыкальные стили */
     .audio-wave {
       display: flex;
       gap: 2px;
@@ -77,15 +76,8 @@
     }
 
     @keyframes wave {
-
-      0%,
-      100% {
-        transform: scaleY(1);
-      }
-
-      50% {
-        transform: scaleY(1.8);
-      }
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.8); }
     }
 
     .music-btn:disabled {
@@ -100,22 +92,92 @@
     .music-paused .audio-wave span {
       animation-play-state: paused;
     }
+
+    /* Стили для модального окна выбора жанра */
+    #genreModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+
+    #genreModal.hidden {
+      display: none;
+    }
+
+    .genre-card {
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+    }
+
+    .genre-card:hover {
+      border-color: #fbbf24;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(251, 191, 36, 0.2);
+    }
+
+    .genre-card.selected {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+    }
   </style>
 </head>
 
 <body class="h-screen flex flex-col overflow-hidden">
+
+  <!-- Модальное окно выбора жанра -->
+  <div id="genreModal">
+    <div class="bg-slate-800 rounded-xl p-8 max-w-2xl w-full mx-4 border border-slate-700 shadow-2xl">
+      <h2 class="text-2xl font-bold text-center mb-2">Выберите жанр истории</h2>
+      <p class="text-center text-gray-400 mb-6">Нажмите на карточку, чтобы начать приключение</p>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="cyberpunk">
+          <h3 class="font-semibold text-fbbf24">Киберпанк</h3>
+          <p class="text-sm text-gray-300 mt-1">Неоновые города, корпорации и высокие технологии</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="fantasy">
+          <h3 class="font-semibold text-fbbf24">Фэнтези</h3>
+          <p class="text-sm text-gray-300 mt-1">Магия, драконы и древние королевства</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="detective">
+          <h3 class="font-semibold text-fbbf24">Детектив</h3>
+          <p class="text-sm text-gray-300 mt-1">Загадочные преступления и запутанные расследования</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="scifi">
+          <h3 class="font-semibold text-fbbf24">Космическая опера</h3>
+          <p class="text-sm text-gray-300 mt-1">Межзвёздные путешествия и инопланетные цивилизации</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="postapoc">
+          <h3 class="font-semibold text-fbbf24">Постапокалипсис</h3>
+          <p class="text-sm text-gray-300 mt-1">Выживание в разрушенном мире после катастрофы</p>
+        </button>
+      </div>
+      
+      <p class="text-xs text-center text-gray-500">
+        История будет сгенерирована с помощью искусственного интеллекта
+      </p>
+    </div>
+  </div>
+
   <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
     <div>
       <h1 class="font-bold text-xl"><i class="fa-solid fa-brain mr-2"></i>NeuroStory</h1>
       <p id="status" class="text-xs text-green-400">AI активен</p>
     </div>
     <div class="flex items-center gap-3">
-      <!-- 🎵 Кнопка управления музыкой -->
       <button id="musicToggle"
         class="music-btn px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm"
         title="Сгенерировать/воспроизвести музыку">
         <i class="fa-solid fa-music"></i>
-        <span id="musicStatus">🎵 Музыка</span>
+        <span id="musicStatus">Музыка</span>
       </button>
       <button onclick="restart()" class="text-gray-300 hover:text-white p-2" title="Начать заново">
         <i class="fa-solid fa-rotate-right"></i>
@@ -124,14 +186,12 @@
   </header>
 
   <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-    <!-- Изображение -->
     <section class="lg:w-2/3 bg-black flex flex-col justify-center items-center p-4">
       <div class="relative w-full max-w-2xl aspect-video bg-slate-900 rounded overflow-hidden border border-slate-700">
         <img id="img" class="w-full h-full object-cover opacity-0 transition-opacity duration-700" />
         <div id="imgLoader" class="absolute inset-0 flex items-center justify-center bg-black/80">
           <div class="loader"></div>
         </div>
-        <!-- 🎵 Индикатор генерации музыки -->
         <div id="musicLoader"
           class="absolute bottom-3 right-3 bg-slate-800/90 px-3 py-1.5 rounded-full text-xs flex items-center gap-2 hidden">
           <div class="audio-wave">
@@ -142,12 +202,10 @@
       </div>
     </section>
 
-    <!-- Текст и выбор -->
     <section class="lg:w-1/3 flex flex-col bg-slate-900 border-l border-slate-800">
       <div id="story" class="flex-1 p-4 overflow-y-auto"></div>
       <div id="choices" class="p-4 bg-slate-800 border-t border-slate-700 space-y-2"></div>
 
-      <!-- 🎵 Панель управления аудио -->
       <div id="audioPanel" class="p-3 bg-slate-800/50 border-t border-slate-700 hidden">
         <div class="flex items-center gap-3">
           <button id="playPauseBtn" class="p-2 rounded-full bg-slate-700 hover:bg-slate-600 transition">
@@ -179,17 +237,46 @@
     const volumeSlider = document.getElementById("volumeSlider");
     const musicInfo = document.getElementById("musicInfo");
     const musicPromptDisplay = document.getElementById("musicPromptDisplay");
+    const genreModal = document.getElementById("genreModal");
 
-    let currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
-    let currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
-    let currentMusicPrompt = "ambient cyberpunk background, slow tempo";
+    // Данные по жанрам
+    const genreData = {
+      cyberpunk: {
+        text: "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.",
+        imagePrompt: "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting, futuristic city",
+        musicPrompt: "ambient cyberpunk background, slow tempo, synthesizer, electronic"
+      },
+      fantasy: {
+        text: "Вы стоите на краю древнего леса. Вдалеке виднеется замок, окутанный туманом.",
+        imagePrompt: "Fantasy medieval castle, misty forest, magical atmosphere, epic lighting, fantasy art",
+        musicPrompt: "epic fantasy orchestral, medieval instruments, mystical atmosphere, slow build"
+      },
+      detective: {
+        text: "Дождь стучит по подоконнику вашего офиса. На столе лежит конверт с анонимным письмом.",
+        imagePrompt: "Noir detective office, rain on window, dim lamp, vintage desk, moody lighting, black and white",
+        musicPrompt: "noir jazz, slow piano, saxophone, mysterious atmosphere, detective theme"
+      },
+      scifi: {
+        text: "Корабль выходит из гиперпространства. Перед вами — неизвестная планета с двумя лунами.",
+        imagePrompt: "Space exploration, alien planet with two moons, spaceship cockpit view, sci-fi cinematic",
+        musicPrompt: "space ambient, ethereal pads, slow tempo, cosmic atmosphere, futuristic"
+      },
+      postapoc: {
+        text: "Вы просыпаетесь в разрушенном здании. За окном — пустынный город, заросший растениями.",
+        imagePrompt: "Post-apocalyptic city ruins, overgrown vegetation, abandoned cars, dramatic sky, desolate",
+        musicPrompt: "post-apocalyptic ambient, haunting melodies, sparse instrumentation, atmospheric"
+      }
+    };
+
+    let currentText = "";
+    let currentImagePrompt = "";
+    let currentMusicPrompt = "";
     let isMusicPlaying = false;
     let musicGenerationPending = false;
+    let selectedGenre = null;
 
-    // 🎵 Глобальный объект для браузерной генерации музыки
     let browserMusic = null;
 
-    // 🔤 Анимация текста
     async function typeText(text) {
       return new Promise(resolve => {
         const p = document.createElement("p");
@@ -210,7 +297,6 @@
       });
     }
 
-    // 🖼️ Загрузка изображения
     async function loadImage(prompt) {
       imgLoader.classList.remove("hidden");
       img.classList.add("opacity-0");
@@ -228,13 +314,7 @@
           img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt)}/800/450`;
         } else {
           const data = await r.json();
-          // Исправлено: добавлен префикс data: для base64
-          console.log(JSON.parse(window.atob(data.imageUrl.split(",")[1])).data[0]["b64_json"])
-          
-          const base64Payload = JSON.parse(window.atob(data.imageUrl.split(",")[1])).data[0]["b64_json"]
-          // const prefix = base64Payload.startsWith('data:') ? '' : 'data:';
-          console.log(base64Payload);
-          
+          const base64Payload = JSON.parse(window.atob(data.imageUrl.split(",")[1])).data[0]["b64_json"];
           img.src = `data:image/png;base64,${base64Payload}`;
         }
 
@@ -252,7 +332,6 @@
       }
     }
 
-    // 🎵 БРАУЗЕРНЫЙ ГЕНЕРАТОР МУЗЫКИ (Web Audio API + Tone.js)
     class BrowserMusicGenerator {
       constructor() {
         this.synth = null;
@@ -263,31 +342,23 @@
         this.currentPrompt = "";
       }
 
-      // Инициализация аудио-контекста (требует жеста пользователя)
       async init() {
         if (this.isInitialized) return true;
-
         try {
           await Tone.start();
-          console.log("🔊 Audio context initialized");
-
-          // Создаём эффекты
+          console.log("Audio context initialized");
           this.reverb = new Tone.Reverb({ decay: 4, wet: 0.3 }).toDestination();
           this.delay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.3, wet: 0.2 }).connect(this.reverb);
-
           this.isInitialized = true;
           return true;
         } catch (err) {
-          console.error("❌ Failed to init audio:", err);
+          console.error("Failed to init audio:", err);
           return false;
         }
       }
 
-      // Парсинг промпта для извлечения параметров
       parsePrompt(prompt) {
         const p = prompt.toLowerCase();
-
-        // Настроение → темп и тональность
         let tempo = 80;
         let rootNote = "C3";
         let scale = "minor";
@@ -301,7 +372,6 @@
           tempo = 70; rootNote = "D#3"; scale = "minor"; mood = "dark";
         }
 
-        // Инструменты
         const instruments = [];
         if (p.includes("synth") || p.includes("electronic")) instruments.push("synth");
         if (p.includes("piano") || p.includes("keys")) instruments.push("piano");
@@ -312,7 +382,6 @@
         return { tempo, rootNote, scale, mood, instruments };
       }
 
-      // Генерация последовательности нот
       generateSequence(params, length = 16) {
         const scales = {
           minor: [0, 2, 3, 5, 7, 8, 10],
@@ -351,7 +420,6 @@
         return `${note}${octave}`;
       }
 
-      // Создание синтезатора под настроение
       createSynth(params) {
         if (params.instruments.includes("piano")) {
           return new Tone.PolySynth(Tone.Synth, {
@@ -366,37 +434,26 @@
             envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 }
           }).connect(this.reverb);
         }
-        // По умолчанию — атмосферный синт
         return new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: params.mood === "dark" ? "sawtooth" : "sine" },
           envelope: { attack: params.mood === "calm" ? 0.5 : 0.1, decay: 0.3, sustain: 0.4, release: params.mood === "calm" ? 1 : 0.5 }
         }).connect(this.delay);
       }
 
-      // 🎵 Основная функция генерации и воспроизведения
       async generateAndPlay(prompt, duration = 15) {
         if (!await this.init()) {
           throw new Error("Не удалось инициализировать аудио. Нажмите на страницу и попробуйте снова.");
         }
-
-        // Останавливаем предыдущее воспроизведение
         this.stop();
-
         const params = this.parsePrompt(prompt);
         this.currentPrompt = prompt;
-
-        console.log(`🎵 Generating: ${prompt} → tempo:${params.tempo} scale:${params.scale} mood:${params.mood}`);
-
-        // Создаём синтезатор
+        console.log(`Generating: ${prompt} -> tempo:${params.tempo} scale:${params.scale} mood:${params.mood}`);
         this.synth = this.createSynth(params);
         this.synth.volume.value = -10;
-
-        // Запускаем секвенсор
         const sequence = this.generateSequence(params);
         let notesPlayed = 0;
-        const maxNotes = Math.floor(duration * params.tempo / 60 / 0.5); // ~2 ноты в секунду
+        const maxNotes = Math.floor(duration * params.tempo / 60 / 0.5);
 
-        // Фоновый дрон для атмосферы
         if (params.instruments.includes("drone")) {
           const drone = new Tone.MembraneSynth({
             pitchDecay: 0.05, octaves: 2,
@@ -405,25 +462,19 @@
           drone.triggerAttackRelease(params.rootNote, duration + 1);
         }
 
-        // Проигрываем последовательность
         Tone.Transport.bpm.value = params.tempo;
-
         const loop = new Tone.Loop((time) => {
           if (notesPlayed >= maxNotes || !this.isPlaying) {
             this.stop();
             return;
           }
-
           const note = sequence[notesPlayed % sequence.length];
           this.synth.triggerAttackRelease(note.note, note.duration, time, note.velocity);
           notesPlayed++;
         }, "8n").start(0);
 
-        // Запускаем транспорт
         Tone.Transport.start();
         this.isPlaying = true;
-
-        // Авто-остановка через duration секунд
         setTimeout(() => {
           if (this.isPlaying) this.stop();
         }, duration * 1000);
@@ -431,17 +482,13 @@
         return { duration, params };
       }
 
-      // Остановка воспроизведения
       stop() {
-        if (this.synth) {
-          this.synth.releaseAll();
-        }
+        if (this.synth) this.synth.releaseAll();
         Tone.Transport.stop();
         Tone.Transport.cancel();
         this.isPlaying = false;
       }
 
-      // Пауза/возобновление
       togglePause() {
         if (!this.isInitialized) return;
         if (Tone.Transport.state === "started") {
@@ -454,20 +501,16 @@
         return this.isPlaying;
       }
 
-      // Установка громкости
       setVolume(value) {
         if (this.synth) {
-          // Конвертируем 0-1 в -60..0 dB
           const db = value === 0 ? -60 : Tone.gainToDb(value);
           this.synth.volume.rampTo(db, 0.1);
         }
       }
     }
 
-    // Инициализация генератора
     browserMusic = new BrowserMusicGenerator();
 
-    // 🎵 Обработчики управления
     volumeSlider.addEventListener('input', (e) => {
       browserMusic?.setVolume(parseFloat(e.target.value));
     });
@@ -483,7 +526,6 @@
 
     musicToggle.addEventListener('click', handleMusicToggle);
 
-    // 🎵 UI обновления
     function updateMusicUI(playing) {
       isMusicPlaying = playing;
       playIcon.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play';
@@ -497,39 +539,29 @@
       musicToggle.classList.toggle("opacity-70", loading);
     }
 
-    // 🎵 Обработчик кнопки музыки
     async function handleMusicToggle() {
       if (musicGenerationPending) return;
-
-      // Если уже сгенерировано и играет — пауза
       if (browserMusic?.isPlaying) {
         browserMusic.togglePause();
         updateMusicUI(false);
         return;
       }
-
-      // Генерация новой музыки
       musicGenerationPending = true;
       musicToggle.disabled = true;
-      setMusicStatus("⏳ Генерация...", true);
-
+      setMusicStatus("Генерация...", true);
       try {
         musicLoader.classList.remove("hidden");
         musicLoaderText.textContent = "Синтез...";
-
         const result = await browserMusic.generateAndPlay(currentMusicPrompt, 15);
-
-        // Обновляем UI
         audioPanel.classList.remove("hidden");
         musicInfo.textContent = `15с • ${result.params.mood} • ${result.params.tempo}BPM`;
         musicPromptDisplay.textContent = currentMusicPrompt;
         updateMusicUI(true);
-        setMusicStatus("🎵 Играет", false);
-
+        setMusicStatus("Играет", false);
       } catch (err) {
         console.error("Music generation error:", err);
-        alert("❌ Не удалось сгенерировать музыку:\n" + (err.message || "Проверьте консоль"));
-        setMusicStatus("🎵 Ошибка", false);
+        alert("Не удалось сгенерировать музыку:\n" + (err.message || "Проверьте консоль"));
+        setMusicStatus("Ошибка", false);
       } finally {
         musicLoader.classList.add("hidden");
         musicGenerationPending = false;
@@ -537,11 +569,10 @@
       }
     }
 
-    // 🎬 Загрузка сцены
     async function loadScene(choice = "") {
       choicesDiv.innerHTML = '<div class="flex justify-center py-4"><div class="loader"></div></div>';
       storyDiv.innerHTML = "";
-      setMusicStatus("🎵 Музыка", false);
+      setMusicStatus("Музыка", false);
 
       if (choice) {
         try {
@@ -550,42 +581,66 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ currentText, choice })
           });
-
           const data = await r.json();
           currentText = data.text || currentText;
           currentImagePrompt = data.imagePrompt || currentImagePrompt;
           currentMusicPrompt = data.musicPrompt || currentMusicPrompt;
 
-          await Promise.all([
-            loadImage(currentImagePrompt)
-            // Браузерная музыка генерируется по запросу пользователя, не автоматически
-          ]);
-
+          await Promise.all([loadImage(currentImagePrompt)]);
           await typeText(currentText);
           renderChoices(data.choices || []);
 
           if (data.musicPrompt) {
-            musicPromptDisplay.textContent = `🎼 ${data.musicPrompt}`;
+            musicPromptDisplay.textContent = data.musicPrompt;
           }
-
         } catch (err) {
           console.error("Scene load error:", err);
           storyDiv.innerHTML = "<p class='text-red-400'>Ошибка загрузки сцены. Попробуйте ещё раз.</p>";
-          renderChoices([{ text: "↻ Повторить", next: choice }]);
+          renderChoices([{ text: "Повторить", next: choice }]);
         }
       } else {
-        // Стартовая сцена
+        // Стартовая сцена с учётом выбранного жанра
+        if (selectedGenre && genreData[selectedGenre]) {
+          currentText = genreData[selectedGenre].text;
+          currentImagePrompt = genreData[selectedGenre].imagePrompt;
+          currentMusicPrompt = genreData[selectedGenre].musicPrompt;
+        }
         await loadImage(currentImagePrompt);
         await typeText(currentText);
-        renderChoices([
-          { text: "Достать устройство", next: "достать устройство" },
-          { text: "Осмотреться", next: "осмотреться" },
-          { text: "Пойти вперёд", next: "пойти вперёд" }
-        ]);
+        
+        // Начальные выборы в зависимости от жанра
+        const startChoices = {
+          cyberpunk: [
+            { text: "Достать устройство", next: "достать устройство" },
+            { text: "Осмотреться", next: "осмотреться" },
+            { text: "Пойти вперёд", next: "пойти вперёд" }
+          ],
+          fantasy: [
+            { text: "Направить взгляд на замок", next: "осмотреть замок" },
+            { text: "Войти в лес", next: "войти в лес" },
+            { text: "Проверить снаряжение", next: "проверить снаряжение" }
+          ],
+          detective: [
+            { text: "Открыть конверт", next: "открыть конверт" },
+            { text: "Позвонить контакту", next: "позвонить контакту" },
+            { text: "Выглянуть в окно", next: "выглянуть в окно" }
+          ],
+          scifi: [
+            { text: "Запустить сканирование планеты", next: "сканировать планету" },
+            { text: "Связаться с базой", next: "связаться с базой" },
+            { text: "Подготовить шаттл", next: "подготовить шаттл" }
+          ],
+          postapoc: [
+            { text: "Обыскать помещение", next: "обыскать помещение" },
+            { text: "Выйти на улицу", next: "выйти на улицу" },
+            { text: "Проверить припасы", next: "проверить припасы" }
+          ]
+        };
+        
+        renderChoices(startChoices[selectedGenre] || startChoices.cyberpunk);
       }
     }
 
-    // 🔘 Отрисовка кнопок выбора
     function renderChoices(items) {
       choicesDiv.innerHTML = "";
       items.forEach(c => {
@@ -597,30 +652,47 @@
       });
     }
 
-    // 🔄 Перезапуск
     function restart() {
-      currentText = "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.";
-      currentImagePrompt = "Cyberpunk alleyway, neon lights, purple fog, cinematic lighting";
-      currentMusicPrompt = "ambient cyberpunk background, slow tempo";
-
-      // Сброс аудио
+      // Сброс к экрану выбора жанра
+      selectedGenre = null;
+      currentText = "";
+      currentImagePrompt = "";
+      currentMusicPrompt = "";
+      
       browserMusic?.stop();
       audioPanel.classList.add("hidden");
-      setMusicStatus("🎵 Музыка", false);
+      setMusicStatus("Музыка", false);
       updateMusicUI(false);
-
+      
       storyDiv.innerHTML = "";
       choicesDiv.innerHTML = "";
       img.classList.add("opacity-0");
+      
+      // Показать модальное окно выбора жанра
+      genreModal.classList.remove("hidden");
+    }
 
+    function startWithGenre(genre) {
+      selectedGenre = genre;
+      genreModal.classList.add("hidden");
       loadScene();
     }
 
-    // 🚀 Старт
+    // Инициализация обработчиков выбора жанра
     document.addEventListener("DOMContentLoaded", () => {
-      loadScene();
+      // Обработчики для карточек жанров
+      document.querySelectorAll('.genre-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const genre = card.dataset.genre;
+          startWithGenre(genre);
+        });
+      });
+      
+      // Инициализация аудио при первом клике по странице
+      document.body.addEventListener('click', () => {
+        browserMusic?.init();
+      }, { once: true });
     });
   </script>
 </body>
-
 </html>
