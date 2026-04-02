@@ -25,9 +25,7 @@
     }
 
     @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     .typing::after {
@@ -36,9 +34,7 @@
     }
 
     @keyframes blink {
-      50% {
-        opacity: 0;
-      }
+      50% { opacity: 0; }
     }
 
     .audio-wave {
@@ -55,25 +51,10 @@
       animation: wave 1s ease-in-out infinite;
     }
 
-    .audio-wave span:nth-child(2) {
-      animation-delay: 0.1s;
-      height: 12px;
-    }
-
-    .audio-wave span:nth-child(3) {
-      animation-delay: 0.2s;
-      height: 16px;
-    }
-
-    .audio-wave span:nth-child(4) {
-      animation-delay: 0.3s;
-      height: 10px;
-    }
-
-    .audio-wave span:nth-child(5) {
-      animation-delay: 0.4s;
-      height: 14px;
-    }
+    .audio-wave span:nth-child(2) { animation-delay: 0.1s; height: 12px; }
+    .audio-wave span:nth-child(3) { animation-delay: 0.2s; height: 16px; }
+    .audio-wave span:nth-child(4) { animation-delay: 0.3s; height: 10px; }
+    .audio-wave span:nth-child(5) { animation-delay: 0.4s; height: 14px; }
 
     @keyframes wave {
       0%, 100% { transform: scaleY(1); }
@@ -85,21 +66,14 @@
       cursor: not-allowed;
     }
 
-    .music-playing .audio-wave span {
-      animation-play-state: running;
-    }
+    .music-playing .audio-wave span { animation-play-state: running; }
+    .music-paused .audio-wave span { animation-play-state: paused; }
 
-    .music-paused .audio-wave span {
-      animation-play-state: paused;
-    }
-
-    /* Стили для модального окна выбора жанра */
+    /* Модальное окно */
     #genreModal {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.95);
       display: flex;
       align-items: center;
@@ -108,13 +82,12 @@
       backdrop-filter: blur(4px);
     }
 
-    #genreModal.hidden {
-      display: none;
-    }
+    #genreModal.hidden { display: none; }
 
     .genre-card {
       transition: all 0.2s ease;
       border: 2px solid transparent;
+      cursor: pointer;
     }
 
     .genre-card:hover {
@@ -127,18 +100,76 @@
       border-color: #fbbf24;
       background: rgba(251, 191, 36, 0.1);
     }
+
+    /* Выпадающее меню жанров */
+    #genreDropdown {
+      position: relative;
+    }
+
+    #genreDropdownMenu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      min-width: 280px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    #genreDropdownMenu.show { display: block; }
+
+    .dropdown-genre-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-bottom: 1px solid #334155;
+    }
+
+    .dropdown-genre-item:last-child { border-bottom: none; }
+    .dropdown-genre-item:hover { background: #334155; }
+    .dropdown-genre-item.active {
+      background: rgba(251, 191, 36, 0.15);
+      border-left: 3px solid #fbbf24;
+    }
+
+    .dropdown-genre-item h4 { font-weight: 600; color: #fbbf24; }
+    .dropdown-genre-item p { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
+
+    /* Анимация появления */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #genreDropdownMenu.show {
+      animation: fadeIn 0.15s ease;
+    }
+
+    /* Скроллбар для меню */
+    #genreDropdownMenu::-webkit-scrollbar { width: 6px; }
+    #genreDropdownMenu::-webkit-scrollbar-track { background: #1e293b; }
+    #genreDropdownMenu::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
   </style>
 </head>
 
 <body class="h-screen flex flex-col overflow-hidden">
 
-  <!-- Модальное окно выбора жанра -->
+  <!-- Модальное окно выбора жанра (при первом входе) -->
   <div id="genreModal">
-    <div class="bg-slate-800 rounded-xl p-8 max-w-2xl w-full mx-4 border border-slate-700 shadow-2xl">
+    <div class="bg-slate-800 rounded-xl p-8 max-w-4xl w-full mx-4 border border-slate-700 shadow-2xl">
       <h2 class="text-2xl font-bold text-center mb-2">Выберите жанр истории</h2>
       <p class="text-center text-gray-400 mb-6">Нажмите на карточку, чтобы начать приключение</p>
       
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="cyberpunk">
           <h3 class="font-semibold text-fbbf24">Киберпанк</h3>
           <p class="text-sm text-gray-300 mt-1">Неоновые города, корпорации и высокие технологии</p>
@@ -159,6 +190,26 @@
           <h3 class="font-semibold text-fbbf24">Постапокалипсис</h3>
           <p class="text-sm text-gray-300 mt-1">Выживание в разрушенном мире после катастрофы</p>
         </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="horror">
+          <h3 class="font-semibold text-fbbf24">Ужасы</h3>
+          <p class="text-sm text-gray-300 mt-1">Мистика, напряжение и леденящие душу тайны</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="romance">
+          <h3 class="font-semibold text-fbbf24">Роман</h3>
+          <p class="text-sm text-gray-300 mt-1">Чувства, отношения и истории о любви</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="steampunk">
+          <h3 class="font-semibold text-fbbf24">Стимпанк</h3>
+          <p class="text-sm text-gray-300 mt-1">Паровые машины, викторианская эстетика и приключения</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="adventure">
+          <h3 class="font-semibold text-fbbf24">Приключения</h3>
+          <p class="text-sm text-gray-300 mt-1">Экспедиции, сокровища и неизведанные земли</p>
+        </button>
+        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="historical">
+          <h3 class="font-semibold text-fbbf24">Исторический</h3>
+          <p class="text-sm text-gray-300 mt-1">Реальные события прошлого и исторические личности</p>
+        </button>
       </div>
       
       <p class="text-xs text-center text-gray-500">
@@ -168,10 +219,63 @@
   </div>
 
   <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
-    <div>
+    <div class="flex items-center gap-4">
       <h1 class="font-bold text-xl"><i class="fa-solid fa-brain mr-2"></i>NeuroStory</h1>
-      <p id="status" class="text-xs text-green-400">AI активен</p>
+      
+      <!-- Выпадающее меню выбора жанра -->
+      <div id="genreDropdown" class="relative">
+        <button id="genreDropdownBtn" 
+          class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm border border-slate-600">
+          <i class="fa-solid fa-book"></i>
+          <span id="currentGenreLabel">Киберпанк</span>
+          <i class="fa-solid fa-chevron-down text-xs"></i>
+        </button>
+        
+        <div id="genreDropdownMenu">
+          <div class="dropdown-genre-item" data-genre="cyberpunk">
+            <h4>Киберпанк</h4>
+            <p>Неоновые города и высокие технологии</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="fantasy">
+            <h4>Фэнтези</h4>
+            <p>Магия, драконы и древние королевства</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="detective">
+            <h4>Детектив</h4>
+            <p>Загадочные преступления и расследования</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="scifi">
+            <h4>Космическая опера</h4>
+            <p>Межзвёздные путешествия и цивилизации</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="postapoc">
+            <h4>Постапокалипсис</h4>
+            <p>Выживание в разрушенном мире</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="horror">
+            <h4>Ужасы</h4>
+            <p>Мистика и леденящие душу тайны</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="romance">
+            <h4>Роман</h4>
+            <p>Чувства, отношения и истории о любви</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="steampunk">
+            <h4>Стимпанк</h4>
+            <p>Паровые машины и викторианская эстетика</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="adventure">
+            <h4>Приключения</h4>
+            <p>Экспедиции и неизведанные земли</p>
+          </div>
+          <div class="dropdown-genre-item" data-genre="historical">
+            <h4>Исторический</h4>
+            <p>Реальные события прошлого</p>
+          </div>
+        </div>
+      </div>
     </div>
+    
     <div class="flex items-center gap-3">
       <button id="musicToggle"
         class="music-btn px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm"
@@ -238,8 +342,11 @@
     const musicInfo = document.getElementById("musicInfo");
     const musicPromptDisplay = document.getElementById("musicPromptDisplay");
     const genreModal = document.getElementById("genreModal");
+    const genreDropdownBtn = document.getElementById("genreDropdownBtn");
+    const genreDropdownMenu = document.getElementById("genreDropdownMenu");
+    const currentGenreLabel = document.getElementById("currentGenreLabel");
 
-    // Данные по жанрам
+    // Данные по жанрам (10 жанров)
     const genreData = {
       cyberpunk: {
         text: "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.",
@@ -265,7 +372,86 @@
         text: "Вы просыпаетесь в разрушенном здании. За окном — пустынный город, заросший растениями.",
         imagePrompt: "Post-apocalyptic city ruins, overgrown vegetation, abandoned cars, dramatic sky, desolate",
         musicPrompt: "post-apocalyptic ambient, haunting melodies, sparse instrumentation, atmospheric"
+      },
+      horror: {
+        text: "Вы входите в старый особняк. Дверь с грохотом захлопывается за вашей спиной.",
+        imagePrompt: "Horror haunted mansion interior, dim candlelight, shadows, gothic architecture, eerie atmosphere",
+        musicPrompt: "dark ambient horror, dissonant strings, low drones, suspenseful, unsettling"
+      },
+      romance: {
+        text: "Вы встречаете незнакомца в уютном кафе. Ваши взгляды случайно пересекаются.",
+        imagePrompt: "Romantic cozy cafe, warm lighting, soft focus, intimate atmosphere, golden hour",
+        musicPrompt: "romantic piano, gentle strings, warm melody, emotional, slow tempo"
+      },
+      steampunk: {
+        text: "Паровой поезд с лязгом останавливается на платформе. В воздухе пахнет углём и маслом.",
+        imagePrompt: "Steampunk train station, brass machinery, Victorian era, steam and gears, industrial fantasy",
+        musicPrompt: "steampunk orchestral, brass instruments, mechanical rhythms, adventurous, Victorian style"
+      },
+      adventure: {
+        text: "Вы стоите у входа в древнюю пещеру. Карта в ваших руках указывает на сокровище внутри.",
+        imagePrompt: "Adventure ancient cave entrance, jungle background, treasure map, dramatic lighting, epic",
+        musicPrompt: "adventure orchestral, heroic themes, percussion, building intensity, cinematic"
+      },
+      historical: {
+        text: "Вы оказываетесь на оживлённой площади средневекового города. Вокруг слышны крики торговцев.",
+        imagePrompt: "Historical medieval town square, period costumes, market stalls, authentic architecture, natural lighting",
+        musicPrompt: "historical medieval music, period instruments, authentic atmosphere, calm narrative"
       }
+    };
+
+    // Начальные выборы для каждого жанра
+    const startChoices = {
+      cyberpunk: [
+        { text: "Достать устройство", next: "достать устройство" },
+        { text: "Осмотреться", next: "осмотреться" },
+        { text: "Пойти вперёд", next: "пойти вперёд" }
+      ],
+      fantasy: [
+        { text: "Направить взгляд на замок", next: "осмотреть замок" },
+        { text: "Войти в лес", next: "войти в лес" },
+        { text: "Проверить снаряжение", next: "проверить снаряжение" }
+      ],
+      detective: [
+        { text: "Открыть конверт", next: "открыть конверт" },
+        { text: "Позвонить контакту", next: "позвонить контакту" },
+        { text: "Выглянуть в окно", next: "выглянуть в окно" }
+      ],
+      scifi: [
+        { text: "Запустить сканирование планеты", next: "сканировать планету" },
+        { text: "Связаться с базой", next: "связаться с базой" },
+        { text: "Подготовить шаттл", next: "подготовить шаттл" }
+      ],
+      postapoc: [
+        { text: "Обыскать помещение", next: "обыскать помещение" },
+        { text: "Выйти на улицу", next: "выйти на улицу" },
+        { text: "Проверить припасы", next: "проверить припасы" }
+      ],
+      horror: [
+        { text: "Позвать в пустоту", next: "позвать" },
+        { text: "Найти источник звука", next: "найти источник" },
+        { text: "Спрятаться", next: "спрятаться" }
+      ],
+      romance: [
+        { text: "Улыбнуться и подойти", next: "подойти" },
+        { text: "Сделать вид, что не заметили", next: "игнорировать" },
+        { text: "Заказать ещё кофе", next: "заказать кофе" }
+      ],
+      steampunk: [
+        { text: "Осмотреть механизм поезда", next: "осмотреть поезд" },
+        { text: "Поговорить с машинистом", next: "поговорить с машинистом" },
+        { text: "Проверить свой багаж", next: "проверить багаж" }
+      ],
+      adventure: [
+        { text: "Зажечь факел и войти", next: "войти в пещеру" },
+        { text: "Обойти пещеру снаружи", next: "обойти пещеру" },
+        { text: "Свериться с картой ещё раз", next: "свериться с картой" }
+      ],
+      historical: [
+        { text: "Направиться к ратуше", next: "пойти к ратуше" },
+        { text: "Расспросить торговца", next: "расспросить торговца" },
+        { text: "Найти местную таверну", next: "найти таверну" }
+      ]
     };
 
     let currentText = "";
@@ -274,6 +460,7 @@
     let isMusicPlaying = false;
     let musicGenerationPending = false;
     let selectedGenre = null;
+    let isFirstLoad = true;
 
     let browserMusic = null;
 
@@ -315,7 +502,7 @@
         } else {
           const data = await r.json();
           const base64Payload = JSON.parse(window.atob(data.imageUrl.split(",")[1])).data[0]["b64_json"];
-          img.src = `data:image/png;base64,${base64Payload}`;
+          img.src = `image/png;base64,${base64Payload}`;
         }
 
         img.onload = () => {
@@ -607,36 +794,6 @@
         }
         await loadImage(currentImagePrompt);
         await typeText(currentText);
-        
-        // Начальные выборы в зависимости от жанра
-        const startChoices = {
-          cyberpunk: [
-            { text: "Достать устройство", next: "достать устройство" },
-            { text: "Осмотреться", next: "осмотреться" },
-            { text: "Пойти вперёд", next: "пойти вперёд" }
-          ],
-          fantasy: [
-            { text: "Направить взгляд на замок", next: "осмотреть замок" },
-            { text: "Войти в лес", next: "войти в лес" },
-            { text: "Проверить снаряжение", next: "проверить снаряжение" }
-          ],
-          detective: [
-            { text: "Открыть конверт", next: "открыть конверт" },
-            { text: "Позвонить контакту", next: "позвонить контакту" },
-            { text: "Выглянуть в окно", next: "выглянуть в окно" }
-          ],
-          scifi: [
-            { text: "Запустить сканирование планеты", next: "сканировать планету" },
-            { text: "Связаться с базой", next: "связаться с базой" },
-            { text: "Подготовить шаттл", next: "подготовить шаттл" }
-          ],
-          postapoc: [
-            { text: "Обыскать помещение", next: "обыскать помещение" },
-            { text: "Выйти на улицу", next: "выйти на улицу" },
-            { text: "Проверить припасы", next: "проверить припасы" }
-          ]
-        };
-        
         renderChoices(startChoices[selectedGenre] || startChoices.cyberpunk);
       }
     }
@@ -652,46 +809,127 @@
       });
     }
 
-    function restart() {
-      // Сброс к экрану выбора жанра
-      selectedGenre = null;
-      currentText = "";
-      currentImagePrompt = "";
-      currentMusicPrompt = "";
+    // Смена жанра с подтверждением
+    function changeGenre(genre) {
+      if (selectedGenre === genre && !isFirstLoad) {
+        // Если жанр не изменился и это не первый запуск — просто закрываем меню
+        toggleGenreDropdown(false);
+        return;
+      }
       
+      if (!isFirstLoad && selectedGenre) {
+        const confirmChange = confirm("Смена жанра начнёт новую историю. Продолжить?");
+        if (!confirmChange) {
+          toggleGenreDropdown(false);
+          return;
+        }
+      }
+      
+      selectedGenre = genre;
+      currentGenreLabel.textContent = genreData[genre].text.split('.')[0];
+      updateActiveGenreInDropdown(genre);
+      toggleGenreDropdown(false);
+      isFirstLoad = false;
+      
+      // Сброс и загрузка новой истории
       browserMusic?.stop();
       audioPanel.classList.add("hidden");
       setMusicStatus("Музыка", false);
       updateMusicUI(false);
-      
       storyDiv.innerHTML = "";
       choicesDiv.innerHTML = "";
       img.classList.add("opacity-0");
       
-      // Показать модальное окно выбора жанра
-      genreModal.classList.remove("hidden");
+      loadScene();
+    }
+
+    function updateActiveGenreInDropdown(genre) {
+      document.querySelectorAll('.dropdown-genre-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.genre === genre);
+      });
+      document.querySelectorAll('.genre-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.genre === genre);
+      });
+    }
+
+    function toggleGenreDropdown(show) {
+      if (show === undefined) {
+        genreDropdownMenu.classList.toggle('show');
+      } else {
+        genreDropdownMenu.classList.toggle('show', show);
+      }
+    }
+
+    function restart() {
+      // Возврат к экрану выбора жанра только если это первый запуск
+      if (isFirstLoad) {
+        selectedGenre = null;
+        currentText = "";
+        currentImagePrompt = "";
+        currentMusicPrompt = "";
+        
+        browserMusic?.stop();
+        audioPanel.classList.add("hidden");
+        setMusicStatus("Музыка", false);
+        updateMusicUI(false);
+        
+        storyDiv.innerHTML = "";
+        choicesDiv.innerHTML = "";
+        img.classList.add("opacity-0");
+        genreModal.classList.remove("hidden");
+      } else {
+        // Перезапуск текущего жанра
+        changeGenre(selectedGenre);
+      }
     }
 
     function startWithGenre(genre) {
       selectedGenre = genre;
+      currentGenreLabel.textContent = genreData[genre].text.split('.')[0].slice(0, 20);
+      updateActiveGenreInDropdown(genre);
       genreModal.classList.add("hidden");
+      isFirstLoad = false;
       loadScene();
     }
 
-    // Инициализация обработчиков выбора жанра
+    // Инициализация
     document.addEventListener("DOMContentLoaded", () => {
-      // Обработчики для карточек жанров
-      document.querySelectorAll('.genre-card').forEach(card => {
+      // Обработчики для карточек жанров в модальном окне
+      document.querySelectorAll('#genreModal .genre-card').forEach(card => {
         card.addEventListener('click', () => {
           const genre = card.dataset.genre;
           startWithGenre(genre);
         });
       });
       
-      // Инициализация аудио при первом клике по странице
+      // Обработчики для выпадающего меню
+      document.querySelectorAll('#genreDropdownMenu .dropdown-genre-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const genre = item.dataset.genre;
+          changeGenre(genre);
+        });
+      });
+      
+      // Кнопка открытия/закрытия выпадающего меню
+      genreDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleGenreDropdown();
+      });
+      
+      // Закрытие меню при клике вне
+      document.addEventListener('click', (e) => {
+        if (!genreDropdownBtn.contains(e.target) && !genreDropdownMenu.contains(e.target)) {
+          toggleGenreDropdown(false);
+        }
+      });
+      
+      // Инициализация аудио при первом клике
       document.body.addEventListener('click', () => {
         browserMusic?.init();
       }, { once: true });
+      
+      // Установка дефолтного жанра для метки
+      currentGenreLabel.textContent = "Выберите жанр";
     });
   </script>
 </body>
