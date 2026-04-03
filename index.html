@@ -3,18 +3,76 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Улучшенный viewport для мобильных: запрет зума интерфейса, но разрешение зума контента -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>NeuroStory</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* === Базовые настройки для мобильных === */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    /* Разрешаем выделение текста в истории */
+    #story, #story * {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    
+    /* Разрешаем выделение в кнопках выбора */
+    #choices button {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
     body {
       background: #0f172a;
       color: #e2e8f0;
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      /* Предотвращаем "отскок" при скролле на iOS */
+      overscroll-behavior: none;
+      /* Плавный скролл на мобильных */
+      -webkit-overflow-scrolling: touch;
     }
 
+    /* === Кастомный скроллбар для мобильных и десктопа === */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 3px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(251, 191, 36, 0.6);
+      border-radius: 3px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(251, 191, 36, 0.9);
+    }
+    
+    /* Для Firefox */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(251, 191, 36, 0.6) rgba(30, 41, 59, 0.5);
+    }
+
+    /* === Анимации === */
     .loader {
       border: 3px solid #333;
       border-top: 3px solid #fbbf24;
@@ -69,7 +127,7 @@
     .music-playing .audio-wave span { animation-play-state: running; }
     .music-paused .audio-wave span { animation-play-state: paused; }
 
-    /* Модальное окно */
+    /* === Модальное окно - адаптивное === */
     #genreModal {
       position: fixed;
       top: 0; left: 0;
@@ -80,14 +138,33 @@
       justify-content: center;
       z-index: 1000;
       backdrop-filter: blur(4px);
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
 
     #genreModal.hidden { display: none; }
+
+    .genre-modal-content {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 95%;
+      max-width: 56rem;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid #334155;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
 
     .genre-card {
       transition: all 0.2s ease;
       border: 2px solid transparent;
       cursor: pointer;
+      min-height: 44px; /* Минимальный размер для тач-интерфейса */
+      touch-action: manipulation;
+    }
+
+    .genre-card:active {
+      transform: scale(0.98);
     }
 
     .genre-card:hover {
@@ -101,9 +178,14 @@
       background: rgba(251, 191, 36, 0.1);
     }
 
-    /* Выпадающее меню жанров */
+    /* === Выпадающее меню - адаптивное === */
     #genreDropdown {
       position: relative;
+    }
+
+    #genreDropdownBtn {
+      touch-action: manipulation;
+      min-height: 44px;
     }
 
     #genreDropdownMenu {
@@ -112,23 +194,44 @@
       right: 0;
       margin-top: 8px;
       min-width: 280px;
+      max-width: 95vw;
       background: #1e293b;
       border: 1px solid #334155;
-      border-radius: 8px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
       z-index: 100;
       display: none;
-      max-height: 400px;
+      max-height: 60vh;
       overflow-y: auto;
+      /* Адаптация для мобильных: на маленьких экранах — на весь экран */
+    }
+    
+    @media (max-width: 480px) {
+      #genreDropdownMenu {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 95%;
+        max-height: 80vh;
+        margin-top: 0;
+        border-radius: 16px;
+      }
     }
 
     #genreDropdownMenu.show { display: block; }
 
     .dropdown-genre-item {
-      padding: 12px 16px;
+      padding: 14px 16px;
       cursor: pointer;
       transition: background 0.15s;
       border-bottom: 1px solid #334155;
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+    
+    .dropdown-genre-item:active {
+      background: rgba(251, 191, 36, 0.1);
     }
 
     .dropdown-genre-item:last-child { border-bottom: none; }
@@ -138,10 +241,10 @@
       border-left: 3px solid #fbbf24;
     }
 
-    .dropdown-genre-item h4 { font-weight: 600; color: #fbbf24; }
-    .dropdown-genre-item p { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
+    .dropdown-genre-item h4 { font-weight: 600; color: #fbbf24; font-size: 0.95rem; }
+    .dropdown-genre-item p { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
 
-    /* Анимация появления */
+    /* === Анимация появления === */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -151,64 +254,238 @@
       animation: fadeIn 0.15s ease;
     }
 
-    /* Скроллбар для меню */
-    #genreDropdownMenu::-webkit-scrollbar { width: 6px; }
-    #genreDropdownMenu::-webkit-scrollbar-track { background: #1e293b; }
-    #genreDropdownMenu::-webkit-scrollbar-thumb {
-      background: #475569;
-      border-radius: 3px;
+    /* === Адаптивные стили для мобильных === */
+    @media (max-width: 768px) {
+      body {
+        font-size: 15px;
+        /* Предотвращаем горизонтальный скролл */
+        overflow-x: hidden;
+      }
+      
+      /* Увеличиваем области нажатия */
+      button, 
+      .genre-card,
+      .dropdown-genre-item,
+      #musicToggle,
+      #playPauseBtn {
+        min-height: 44px;
+        min-width: 44px;
+        touch-action: manipulation;
+      }
+      
+      /* Увеличиваем шрифты для читаемости */
+      #story p {
+        font-size: 1.05rem;
+        line-height: 1.6;
+      }
+      
+      #choices button {
+        font-size: 1rem;
+        padding: 0.875rem 1rem;
+      }
+      
+      /* Адаптация хедера */
+      header {
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      
+      header h1 {
+        font-size: 1.1rem;
+      }
+      
+      /* Адаптация основного контента */
+      main {
+        /* На мобильных — вертикальная прокрутка вместо фиксированной высоты */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      section.lg\:w-2\/3 {
+        width: 100% !important;
+        max-height: 50vh;
+      }
+      
+      section.lg\:w-1\/3 {
+        width: 100% !important;
+        max-height: 50vh;
+      }
+      
+      /* Адаптация изображения */
+      .aspect-video {
+        aspect-ratio: 16/9;
+        width: 100%;
+      }
+      
+      /* Улучшаем скролл в истории и выборе */
+      #story {
+        padding: 1rem;
+        font-size: 1rem;
+        /* Показываем индикатор скролла */
+        scrollbar-gutter: stable;
+      }
+      
+      #choices {
+        padding: 0.75rem;
+        /* Кнопки с отступами для тач-интерфейса */
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      
+      #choices button {
+        border-radius: 10px;
+        /* Визуальная обратная связь при нажатии */
+        transition: transform 0.1s, background 0.15s;
+      }
+      
+      #choices button:active {
+        transform: scale(0.99);
+        background: #475569 !important;
+      }
+      
+      /* Аудио-панель на мобильных */
+      #audioPanel {
+        padding: 0.75rem;
+      }
+      
+      #playPauseBtn {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      /* Улучшаем модальное окно на мобильных */
+      .genre-modal-content {
+        padding: 1.25rem;
+        border-radius: 20px;
+      }
+      
+      .genre-card {
+        padding: 1rem;
+        border-radius: 12px;
+      }
+      
+      /* Скрываем декоративные элементы на маленьких экранах для производительности */
+      .audio-wave span {
+        animation-duration: 0.8s;
+      }
+    }
+    
+    /* === Очень маленькие экраны (например, старые телефоны) === */
+    @media (max-width: 360px) {
+      body {
+        font-size: 14px;
+      }
+      
+      #story p {
+        font-size: 0.95rem;
+      }
+      
+      #choices button {
+        font-size: 0.9rem;
+        padding: 0.75rem;
+      }
+      
+      header h1 {
+        font-size: 1rem;
+      }
+      
+      .genre-card h3 {
+        font-size: 0.9rem;
+      }
+      
+      .genre-card p {
+        font-size: 0.75rem;
+      }
+    }
+    
+    /* === Поддержка safe areas для iPhone с вырезом === */
+    @supports (padding: max(0px)) {
+      header {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+        padding-top: max(0.75rem, env(safe-area-inset-top));
+      }
+      
+      main {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
+    
+    /* === Улучшения для тёмной темы и контраста === */
+    @media (prefers-contrast: high) {
+      .genre-card.selected {
+        border-width: 3px;
+      }
+      
+      button:hover {
+        border-width: 2px;
+      }
+    }
+    
+    /* === Отключаем анимации при prefers-reduced-motion === */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>
 
-<body class="h-screen flex flex-col overflow-hidden">
+<body class="h-screen flex flex-col">
 
-  <!-- Модальное окно выбора жанра (при первом входе) -->
+  <!-- Модальное окно выбора жанра -->
   <div id="genreModal">
-    <div class="bg-slate-800 rounded-xl p-8 max-w-4xl w-full mx-4 border border-slate-700 shadow-2xl">
-      <h2 class="text-2xl font-bold text-center mb-2">Выберите жанр истории</h2>
-      <p class="text-center text-gray-400 mb-6">Нажмите на карточку, чтобы начать приключение</p>
+    <div class="genre-modal-content">
+      <h2 class="text-xl font-bold text-center mb-2">Выберите жанр истории</h2>
+      <p class="text-center text-gray-400 mb-4 text-sm">Нажмите на карточку, чтобы начать приключение</p>
       
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="cyberpunk">
-          <h3 class="font-semibold text-fbbf24">Киберпанк</h3>
-          <p class="text-sm text-gray-300 mt-1">Неоновые города, корпорации и высокие технологии</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="cyberpunk">
+          <h3 class="font-semibold text-fbbf24 text-sm">Киберпанк</h3>
+          <p class="text-xs text-gray-300 mt-1">Неоновые города, корпорации и технологии</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="fantasy">
-          <h3 class="font-semibold text-fbbf24">Фэнтези</h3>
-          <p class="text-sm text-gray-300 mt-1">Магия, драконы и древние королевства</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="fantasy">
+          <h3 class="font-semibold text-fbbf24 text-sm">Фэнтези</h3>
+          <p class="text-xs text-gray-300 mt-1">Магия, драконы и древние королевства</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="detective">
-          <h3 class="font-semibold text-fbbf24">Детектив</h3>
-          <p class="text-sm text-gray-300 mt-1">Загадочные преступления и запутанные расследования</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="detective">
+          <h3 class="font-semibold text-fbbf24 text-sm">Детектив</h3>
+          <p class="text-xs text-gray-300 mt-1">Загадочные преступления и расследования</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="scifi">
-          <h3 class="font-semibold text-fbbf24">Космическая опера</h3>
-          <p class="text-sm text-gray-300 mt-1">Межзвёздные путешествия и инопланетные цивилизации</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="scifi">
+          <h3 class="font-semibold text-fbbf24 text-sm">Космическая опера</h3>
+          <p class="text-xs text-gray-300 mt-1">Межзвёздные путешествия и цивилизации</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="postapoc">
-          <h3 class="font-semibold text-fbbf24">Постапокалипсис</h3>
-          <p class="text-sm text-gray-300 mt-1">Выживание в разрушенном мире после катастрофы</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="postapoc">
+          <h3 class="font-semibold text-fbbf24 text-sm">Постапокалипсис</h3>
+          <p class="text-xs text-gray-300 mt-1">Выживание в разрушенном мире</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="horror">
-          <h3 class="font-semibold text-fbbf24">Ужасы</h3>
-          <p class="text-sm text-gray-300 mt-1">Мистика, напряжение и леденящие душу тайны</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="horror">
+          <h3 class="font-semibold text-fbbf24 text-sm">Ужасы</h3>
+          <p class="text-xs text-gray-300 mt-1">Мистика и леденящие душу тайны</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="romance">
-          <h3 class="font-semibold text-fbbf24">Роман</h3>
-          <p class="text-sm text-gray-300 mt-1">Чувства, отношения и истории о любви</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="romance">
+          <h3 class="font-semibold text-fbbf24 text-sm">Роман</h3>
+          <p class="text-xs text-gray-300 mt-1">Чувства, отношения и истории о любви</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="steampunk">
-          <h3 class="font-semibold text-fbbf24">Стимпанк</h3>
-          <p class="text-sm text-gray-300 mt-1">Паровые машины, викторианская эстетика и приключения</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="steampunk">
+          <h3 class="font-semibold text-fbbf24 text-sm">Стимпанк</h3>
+          <p class="text-xs text-gray-300 mt-1">Паровые машины и викторианская эстетика</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="adventure">
-          <h3 class="font-semibold text-fbbf24">Приключения</h3>
-          <p class="text-sm text-gray-300 mt-1">Экспедиции, сокровища и неизведанные земли</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="adventure">
+          <h3 class="font-semibold text-fbbf24 text-sm">Приключения</h3>
+          <p class="text-xs text-gray-300 mt-1">Экспедиции и неизведанные земли</p>
         </button>
-        <button class="genre-card p-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="historical">
-          <h3 class="font-semibold text-fbbf24">Исторический</h3>
-          <p class="text-sm text-gray-300 mt-1">Реальные события прошлого и исторические личности</p>
+        <button class="genre-card p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-left" data-genre="historical">
+          <h3 class="font-semibold text-fbbf24 text-sm">Исторический</h3>
+          <p class="text-xs text-gray-300 mt-1">Реальные события прошлого</p>
         </button>
       </div>
       
@@ -218,17 +495,17 @@
     </div>
   </div>
 
-  <header class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex justify-between items-center">
-    <div class="flex items-center gap-4">
-      <h1 class="font-bold text-xl"><i class="fa-solid fa-brain mr-2"></i>NeuroStory</h1>
+  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <h1 class="font-bold text-lg"><i class="fa-solid fa-brain mr-1.5"></i>NeuroStory</h1>
       
       <!-- Выпадающее меню выбора жанра -->
       <div id="genreDropdown" class="relative">
         <button id="genreDropdownBtn" 
-          class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm border border-slate-600">
+          class="px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-1.5 text-xs border border-slate-600">
           <i class="fa-solid fa-book"></i>
-          <span id="currentGenreLabel">Киберпанк</span>
-          <i class="fa-solid fa-chevron-down text-xs"></i>
+          <span id="currentGenreLabel" class="max-w-24 truncate">Киберпанк</span>
+          <i class="fa-solid fa-chevron-down text-[10px]"></i>
         </button>
         
         <div id="genreDropdownMenu">
@@ -276,28 +553,28 @@
       </div>
     </div>
     
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
       <button id="musicToggle"
-        class="music-btn px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-2 text-sm"
+        class="music-btn px-2.5 py-2 rounded bg-slate-700 hover:bg-slate-600 transition flex items-center gap-1.5 text-xs"
         title="Сгенерировать/воспроизвести музыку">
         <i class="fa-solid fa-music"></i>
-        <span id="musicStatus">Музыка</span>
+        <span id="musicStatus" class="hidden sm:inline">Музыка</span>
       </button>
       <button onclick="restart()" class="text-gray-300 hover:text-white p-2" title="Начать заново">
-        <i class="fa-solid fa-rotate-right"></i>
+        <i class="fa-solid fa-rotate-right text-sm"></i>
       </button>
     </div>
   </header>
 
   <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-    <section class="lg:w-2/3 bg-black flex flex-col justify-center items-center p-4">
-      <div class="relative w-full max-w-2xl aspect-video bg-slate-900 rounded overflow-hidden border border-slate-700">
-        <img id="img" class="w-full h-full object-cover opacity-0 transition-opacity duration-700" />
+    <section class="lg:w-2/3 bg-black flex flex-col justify-center items-center p-3">
+      <div class="relative w-full max-w-2xl aspect-video bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
+        <img id="img" class="w-full h-full object-cover opacity-0 transition-opacity duration-700" alt="Сцена истории" />
         <div id="imgLoader" class="absolute inset-0 flex items-center justify-center bg-black/80">
           <div class="loader"></div>
         </div>
         <div id="musicLoader"
-          class="absolute bottom-3 right-3 bg-slate-800/90 px-3 py-1.5 rounded-full text-xs flex items-center gap-2 hidden">
+          class="absolute bottom-2 right-2 bg-slate-800/90 px-2.5 py-1 rounded-full text-[10px] flex items-center gap-1.5 hidden">
           <div class="audio-wave">
             <span></span><span></span><span></span><span></span><span></span>
           </div>
@@ -307,20 +584,20 @@
     </section>
 
     <section class="lg:w-1/3 flex flex-col bg-slate-900 border-l border-slate-800">
-      <div id="story" class="flex-1 p-4 overflow-y-auto"></div>
-      <div id="choices" class="p-4 bg-slate-800 border-t border-slate-700 space-y-2"></div>
+      <div id="story" class="flex-1 p-3 overflow-y-auto text-sm"></div>
+      <div id="choices" class="p-3 bg-slate-800 border-t border-slate-700 space-y-2"></div>
 
-      <div id="audioPanel" class="p-3 bg-slate-800/50 border-t border-slate-700 hidden">
-        <div class="flex items-center gap-3">
+      <div id="audioPanel" class="p-2.5 bg-slate-800/50 border-t border-slate-700 hidden">
+        <div class="flex items-center gap-2.5">
           <button id="playPauseBtn" class="p-2 rounded-full bg-slate-700 hover:bg-slate-600 transition">
-            <i class="fa-solid fa-play" id="playIcon"></i>
+            <i class="fa-solid fa-play text-sm" id="playIcon"></i>
           </button>
           <div class="flex-1">
-            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" class="w-full accent-fbbf24">
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" class="w-full accent-fbbf24 h-1">
           </div>
-          <span class="text-xs text-gray-400" id="musicInfo">—</span>
+          <span class="text-[10px] text-gray-400" id="musicInfo">—</span>
         </div>
-        <p id="musicPromptDisplay" class="text-xs text-gray-500 mt-1 truncate"></p>
+        <p id="musicPromptDisplay" class="text-[10px] text-gray-500 mt-1 truncate"></p>
       </div>
     </section>
   </main>
@@ -346,7 +623,7 @@
     const genreDropdownMenu = document.getElementById("genreDropdownMenu");
     const currentGenreLabel = document.getElementById("currentGenreLabel");
 
-    // Данные по жанрам (10 жанров)
+    // Данные по жанрам
     const genreData = {
       cyberpunk: {
         text: "Вы открываете глаза в неоновом переулке. В кармане что-то вибрирует.",
@@ -400,7 +677,6 @@
       }
     };
 
-    // Начальные выборы для каждого жанра
     const startChoices = {
       cyberpunk: [
         { text: "Достать устройство", next: "достать устройство" },
@@ -467,14 +743,14 @@
     async function typeText(text) {
       return new Promise(resolve => {
         const p = document.createElement("p");
-        p.className = "text-lg leading-relaxed typing text-gray-300";
+        p.className = "text-lg leading-relaxed typing text-gray-300 mb-3";
         storyDiv.appendChild(p);
         let i = 0;
         const tick = () => {
           if (i < text.length) {
             p.textContent += text[i++];
             storyDiv.scrollTop = storyDiv.scrollHeight;
-            setTimeout(tick, 25);
+            setTimeout(tick, 20); // Чуть быстрее для мобильных
           } else {
             p.classList.remove("typing");
             resolve();
@@ -498,7 +774,10 @@
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
           console.warn("Image generation warning:", err);
-          img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt)}/800/450`;
+          // Используем плейсхолдер с правильным размером для мобильных
+          const width = window.innerWidth <= 768 ? 400 : 800;
+          const height = Math.round(width * 9/16);
+          img.src = `https://picsum.photos/seed/${encodeURIComponent(prompt)}/${width}/${height}`;
         } else {
           const data = await r.json();
           const base64Payload = JSON.parse(window.atob(data.imageUrl.split(",")[1])).data[0]["b64_json"];
@@ -786,7 +1065,6 @@
           renderChoices([{ text: "Повторить", next: choice }]);
         }
       } else {
-        // Стартовая сцена с учётом выбранного жанра
         if (selectedGenre && genreData[selectedGenre]) {
           currentText = genreData[selectedGenre].text;
           currentImagePrompt = genreData[selectedGenre].imagePrompt;
@@ -802,17 +1080,15 @@
       choicesDiv.innerHTML = "";
       items.forEach(c => {
         const btn = document.createElement("button");
-        btn.className = "w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition border border-transparent hover:border-fbbf24";
+        btn.className = "w-full text-left p-3 rounded bg-slate-700 hover:bg-slate-600 transition border border-transparent hover:border-fbbf24 text-sm";
         btn.textContent = c.text;
         btn.onclick = () => loadScene(c.text);
         choicesDiv.appendChild(btn);
       });
     }
 
-    // Смена жанра с подтверждением
     function changeGenre(genre) {
       if (selectedGenre === genre && !isFirstLoad) {
-        // Если жанр не изменился и это не первый запуск — просто закрываем меню
         toggleGenreDropdown(false);
         return;
       }
@@ -826,12 +1102,13 @@
       }
       
       selectedGenre = genre;
-      currentGenreLabel.textContent = genreData[genre].text.split('.')[0];
+      // Обрезаем длинное название для мобильных
+      const label = genreData[genre].text.split('.')[0];
+      currentGenreLabel.textContent = window.innerWidth <= 480 ? label.slice(0, 12) + '…' : label;
       updateActiveGenreInDropdown(genre);
       toggleGenreDropdown(false);
       isFirstLoad = false;
       
-      // Сброс и загрузка новой истории
       browserMusic?.stop();
       audioPanel.classList.add("hidden");
       setMusicStatus("Музыка", false);
@@ -861,7 +1138,6 @@
     }
 
     function restart() {
-      // Возврат к экрану выбора жанра только если это первый запуск
       if (isFirstLoad) {
         selectedGenre = null;
         currentText = "";
@@ -878,14 +1154,14 @@
         img.classList.add("opacity-0");
         genreModal.classList.remove("hidden");
       } else {
-        // Перезапуск текущего жанра
         changeGenre(selectedGenre);
       }
     }
 
     function startWithGenre(genre) {
       selectedGenre = genre;
-      currentGenreLabel.textContent = genreData[genre].text.split('.')[0].slice(0, 20);
+      const label = genreData[genre].text.split('.')[0];
+      currentGenreLabel.textContent = window.innerWidth <= 480 ? label.slice(0, 12) + '…' : label;
       updateActiveGenreInDropdown(genre);
       genreModal.classList.add("hidden");
       isFirstLoad = false;
@@ -894,7 +1170,7 @@
 
     // Инициализация
     document.addEventListener("DOMContentLoaded", () => {
-      // Обработчики для карточек жанров в модальном окне
+      // Обработчики для карточек жанров
       document.querySelectorAll('#genreModal .genre-card').forEach(card => {
         card.addEventListener('click', () => {
           const genre = card.dataset.genre;
@@ -910,7 +1186,7 @@
         });
       });
       
-      // Кнопка открытия/закрытия выпадающего меню
+      // Кнопка меню жанров
       genreDropdownBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         toggleGenreDropdown();
@@ -923,14 +1199,40 @@
         }
       });
       
-      // Инициализация аудио при первом клике
+      // Инициализация аудио
       document.body.addEventListener('click', () => {
         browserMusic?.init();
       }, { once: true });
       
-      // Установка дефолтного жанра для метки
+      // Обработка изменения размера окна для адаптации текста
+      window.addEventListener('resize', () => {
+        if (selectedGenre) {
+          const label = genreData[selectedGenre].text.split('.')[0];
+          currentGenreLabel.textContent = window.innerWidth <= 480 ? label.slice(0, 12) + '…' : label;
+        }
+      });
+      
+      // Предотвращение зума при двойном тапе на кнопки (для старых браузеров)
+      document.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('touchstart', (e) => {
+          if (e.touches.length > 1) {
+            e.preventDefault();
+          }
+        }, { passive: false });
+      });
+      
       currentGenreLabel.textContent = "Выберите жанр";
     });
+    
+    // Исправление для 100vh на мобильных с адресной строкой
+    function setVhProperty() {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    
+    setVhProperty();
+    window.addEventListener('resize', setVhProperty);
+    window.addEventListener('orientationchange', setVhProperty);
   </script>
 </body>
 </html>
